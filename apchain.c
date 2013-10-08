@@ -1,0 +1,104 @@
+#include <stdio.h>
+#include <limits.h>
+#include <unistd.h>
+#include <math.h>
+#include "wrapper.h"
+
+#define NUM_STAGES 16
+#define FOR(var,limit) for(int var = 0; var < limit; ++var)
+
+static float* inbuf;
+static float* outbuf;
+
+static double dt;
+
+#define CC_CUTOFF 77
+
+static double apstate[NUM_STAGES];
+
+static void init(double nframes_per_second) {
+  fprintf(stderr, "initializing, sample rate = %f\n", nframes_per_second);
+  dt = 1.0 / nframes_per_second;
+}
+
+
+static double calc_apcoeff() {
+    /*
+
+      H(s) = (1 - s/w) / (1 + s/w)
+
+      BLT: s = 2 (1 - z^-1) / (1 + z^-1)
+             = 2 (z - 1) / (z + 1)
+
+      H(z) = (1 - 2/w (z-1) / (z+1)) / (1 + 2/w (z-1) / (z+1))
+           = ((z+1) - 2/w (z-1)) / ((z+1) + 2/w (z-1))
+           = ((1-2/w)z + (1+2/w)) / ((1+2/w)z + (1-2/w))
+           = (az + 1) / (z + a)
+
+      a = (1-2/w)/(1+2/w)
+        = (w-2)/(w+2)
+
+
+      w = 2 tan (w_digital / 2)
+
+      (((
+      a = (2 tan - 2) / (2 tan + 2)
+        = (tan - 1) / (tan + 1)
+        = (sin/cos - 1) / (sin + cos)
+        = (sin - cos) / (sin + cos) 
+      )))
+
+               +--------(k)---+
+               V              |
+      X ----->(+)-+->[ z^-1 ]-+->(+)--> Y
+                  |               A
+                  +-----(-k)------+
+
+     U = (X + kUz^-1)
+     U (1 - kz^-1) = X
+     U/X = 1 / (1 - kz^-1)
+
+     Y = -kU + Uz^-1
+     Y/U = (k - z^-1)
+
+     Y/X = (k - z^-1) / (1 - kz^-1)
+   */
+
+  double freq = 440.0 * pow(2.0, (cc[CC_CUTOFF] - 69 + 32) / 12.0);
+  //printf("freq = %s\n", freq);
+  freq *= dt;
+  if (freq > 0.49) freq = 0.49;
+  double w_digital = 2 * 3.141592 * freq;
+  double w_analog = 2 * tan(w_digital / 2);
+  double apcoeff = -(w_analog-2)/(w_analog+2);
+  return apcoeff;
+}
+
+static double ap_tick(double* state, double in, double apcoeff) {
+  double out = *state;
+  in += apcoeff * out;
+  out -= apcoeff * in;
+  *state = in;
+  return out;
+}
+
+static void process(int nframes) {
+  FOR(f, nframes) {
+    double apcoeff = calc_apcoeff();
+    double x = inbuf[f] + 1e-12;
+    FOR(s, NUM_STAGES) {
+      x = ap_tick(&apstate[s], x, apcoeff);
+    }
+    outbuf[f] = x;
+  }
+}
+
+int main(int argc, char** argv) {
+  wrapper_init(&argc, &argv, "APChain", "mjack_apchain");
+  init(wrapper_get_sample_rate());
+  wrapper_add_audio_input("in", &inbuf);
+  wrapper_add_audio_output("out", &outbuf);
+  wrapper_add_cc(CC_CUTOFF, "Cutoff", "cutoff", 64);
+  wrapper_run();
+  return 0;
+}
