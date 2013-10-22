@@ -10,8 +10,6 @@
 #define M_PI 3.14159265358979323846
 #endif 
 
-static jack_port_t* midi_in_port;
-
 #define FOR(var,limit) for(int var = 0; var < limit; ++var)
 
 static void* midi_in_buf;
@@ -30,6 +28,7 @@ static double dt;
 #define CC_RESONANCE 71
 #define CC_TRACKING 80
 #define CC_GRIT 75
+#define CC_BRIGHTNESS 76 // TODO assign
 
 // dsp control values
 static double gain;
@@ -52,9 +51,10 @@ struct svf_state {
   double z1, z2;
 };
 
+static struct svf_state svf_state;
 static struct svf_state env_state;
 
-double svf_tick(struct svf_state* state, double input, double freq, double q) {
+static double svf_tick(struct svf_state* state, double input, double freq, double q) {
   freq *= dt;
   if (freq > 0.499) {
     freq = 0.499;
@@ -96,7 +96,11 @@ double svf_tick(struct svf_state* state, double input, double freq, double q) {
   return lp;
 }
 
-double svf_tick_nonlinear(struct svf_state* state, double input, double freq, double q) {
+static double shape(double x) {
+  return fabs(x) < 1e-12 ? 1.0 : tanh(x) / x;
+}
+
+static double svf_tick_nonlinear(struct svf_state* state, double input, double freq, double q) {
   freq *= dt;
   if (freq > 0.499) {
     freq = 0.499;
@@ -124,12 +128,12 @@ double svf_tick_nonlinear(struct svf_state* state, double input, double freq, do
 
   double f = tan(0.5 * omega);
 
-  double grit = cc[CC_GRIT] * (2.0/127.0);
+  double grit = (1 + wrapper_cc[CC_GRIT]) * (2.0/127.0);
   grit *= grit;
   double half_delayed_input = (input + state->last_input) * 0.5;
   double fb = half_delayed_input - q * state->z1 - state->z2;
-  double k1 = f/sqrt(1.0 + fb*fb * grit);
-  double k2 = f/sqrt(1.0 + state->z1*state->z1 * grit);
+  double k1 = f * shape(fb * grit);
+  double k2 = f * shape(state->z2 * grit);
 
   double r = q + k2;
   double g = 1 / (k1 * r + 1);
@@ -152,7 +156,7 @@ static void init(double sample_rate) {
   dt = 1.0 / sample_rate;
   lfo1_freq = 5.0;
   lfo2_freq = 0.32195813;
-  printf("dt = %lf\n", dt);
+  printf("dt = %lg\n", dt);
 }
 static void handle_midi_note_off(int key, int velocity) {
   if (key_is_pressed[key]) {
@@ -270,13 +274,14 @@ static double tick_osc_ln(struct osc_state* osc_state, double freq) {
   osc_state->phase += freq * dt;
   if (osc_state->phase > 0.5) { osc_state->phase -= 1.0; }
   
-  double k = cc[CC_GRIT] / 128.0 + 0.5;
+  double k = wrapper_cc[CC_BRIGHTNESS] / 128.0 + 0.5;
   k = exp(-freq / (20000 * k * k * k * k * k * k));
   //static double lastk;
   //if (k != lastk) { printf("%lf\n", k); lastk = k; }
   double x = 1.0 + k * cos(osc_state->phase * 2 * 3.1415917);
   double y = k * sin(osc_state->phase * 2 * 3.1415917);
 
+  //return y / sqrt(1 + x*x) / k;
   return atan2(y,x) / k;
 }
 
@@ -289,18 +294,16 @@ static void generate_audio(int start_frame, int end_frame) {
     double lfo1 = tick_lfo(&lfo1_phase, lfo1_freq);
     double lfo2 = tick_lfo(&lfo2_phase, lfo2_freq);
     double osc = tick_osc(&osc_state, osc_freq * exp(0.000 * lfo1 + 0.000 * lfo2));
-    //double svf_freq = 440.0 * pow(2.0, (current_key - 69) / 12.0 * (cc[CC_TRACKING] / 127.0) + (cc[CC_CUTOFF] - 69 + 36) / 12.0);
-    //double svf_q = 1.0 - cc[CC_RESONANCE] / 127.0;
-    //double svf = svf_tick_nonlinear(&svf_state, osc, svf_freq, svf_q);
-    double svf = osc;
+    double svf_freq = 440.0 * pow(2.0, (current_key - 69) / 12.0 * (wrapper_cc[CC_TRACKING] / 127.0) + (wrapper_cc[CC_CUTOFF] - 69 + 36) / 12.0);
+    double svf_q = 1.0 - wrapper_cc[CC_RESONANCE] / 127.0;
+    double svf = svf_tick_nonlinear(&svf_state, osc, svf_freq, svf_q);
     double env = svf_tick(&env_state, gain, env_freq, env_q);
-    double volume = cc[CC_VOLUME] * cc[CC_VOLUME] / (127.0 * 127.0) * 0.25;
+    double volume = wrapper_cc[CC_VOLUME] * wrapper_cc[CC_VOLUME] / (127.0 * 127.0) * 0.25;
     audio_out_buf[i] = svf * env * volume;
   }
 }
 
-static void process(int nframes) {
-  midi_in_buf = jack_port_get_buffer(midi_in_port, nframes);
+void plugin_process(int nframes) {
   jack_nframes_t num_events = jack_midi_get_event_count(midi_in_buf);
   int sample_index = 0;
   FOR(e, num_events) {
@@ -320,13 +323,13 @@ static void process(int nframes) {
 int main(int argc, char** argv) {
   wrapper_init(&argc, &argv, "sawsynth", "mjack_sawsynth");
   init(wrapper_get_sample_rate());
-  midi_in_port = jack_port_register(jack_client, "midi in", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
-  CHECK(midi_in_port, "jack_port_register");
+  wrapper_add_midi_input("midi in", &midi_in_buf);
   wrapper_add_audio_output("audio out", &audio_out_buf);
   wrapper_add_cc(CC_VOLUME, "Volume", "volume", 64);
   wrapper_add_cc(CC_CUTOFF, "Cutoff", "cutoff", 64);
   wrapper_add_cc(CC_RESONANCE, "Resonance", "resonance", 64);
   wrapper_add_cc(CC_GRIT, "Grit", "grit", 0);
+  wrapper_add_cc(CC_BRIGHTNESS, "Brightness", "brightness", 0);
   wrapper_add_cc(CC_TRACKING, "Tracking", "tracking", 64);
   wrapper_run();
   return 0;

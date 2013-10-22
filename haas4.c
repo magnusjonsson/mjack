@@ -28,9 +28,9 @@ static float* outbufs[NUM_OUTS];
 static int head;
 static float mixbufs[NUM_OUTS][MIXBUF_LENGTH];
 
-static void init(jack_nframes_t nframes_per_second) {
-  fprintf(stderr, "initializing, sample rate = %i\n", nframes_per_second);
-  FOR(out, NUM_OUTS) FOR(in, NUM_INS) offset[out][in] = (int) (offset_millis[out][in] * nframes_per_second / 1000.0 + 0.5);
+static void init(double sample_rate) {
+  fprintf(stderr, "initializing, sample rate = %f\n", sample_rate);
+  FOR(out, NUM_OUTS) FOR(in, NUM_INS) offset[out][in] = (int) (offset_millis[out][in] * sample_rate / 1000.0 + 0.5);
   FOR(out, NUM_OUTS) FOR(in, NUM_INS) fprintf(stderr, "in %i, out %i, offset %i\n", in, out, offset[out][in]);
 }
 
@@ -43,7 +43,7 @@ static void mix(int nframes) {
   FOR(out, NUM_OUTS) outbufs[out] += nframes;
 }
 
-static void process(int nframes) {
+void plugin_process(int nframes) {
   while (nframes > MIXBUF_LENGTH) { mix(MIXBUF_LENGTH); nframes -= MIXBUF_LENGTH; }
   if (nframes > 0) mix(nframes);
 }
