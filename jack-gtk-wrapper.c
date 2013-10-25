@@ -1,6 +1,7 @@
 #include "wrapper.h"
 #include <getopt.h>
 #include <string.h>
+#include <memory.h>
 #include <jack/jack.h>
 #include <jack/session.h>
 #include <gtk/gtk.h>
@@ -8,6 +9,8 @@
 
 typedef jack_port_t port_t;
 typedef jack_port_t port_t;
+
+static struct instance instance;
 
 static jack_client_t* jack_client;
 static jack_status_t jack_status;
@@ -19,7 +22,6 @@ static void** jack_buf[MAX_NUM_PORTS];
 #define FOR(var,limit) for(int var = 0; var < limit; ++var)
 #define CHECK(prop, msg) if (!(prop)) { fprintf(stderr, "Error: " msg "\n"); exit(1); }
 
-static char cc[128];
 static const char* cc_persist_name[128];
 
 static GtkAdjustment* cc_adjustment[128];
@@ -34,12 +36,12 @@ static void cb_value_changed(GtkAdjustment* adj, char* pointer_into_cc_array) {
 static void update_slider(int cc_number) {
   GtkAdjustment* adj = cc_adjustment[cc_number];
   if (adj != NULL) {
-    gtk_adjustment_set_value(adj, cc[cc_number]);
+    gtk_adjustment_set_value(adj, instance.wrapper_cc[cc_number]);
   }
 }
 
 static void save_cc(struct json_object* cc_obj, int cc_number, const char* name) {
-  return json_object_object_add(cc_obj, name, json_object_new_int(cc[cc_number]));
+  return json_object_object_add(cc_obj, name, json_object_new_int(instance.wrapper_cc[cc_number]));
 }
 
 static void save(char* filename) {
@@ -59,9 +61,9 @@ static void load_cc(struct json_object* cc_obj, int cc_number, const char* name)
     fprintf(stderr, "Could not load cc %i (%s)\n", cc_number, name);
     return;
   }
-  cc[cc_number] = json_object_get_int(tmp);
+  instance.wrapper_cc[cc_number] = json_object_get_int(tmp);
   update_slider(cc_number);
-  fprintf(stderr, "set cc %i to %i\n", cc_number, (int) cc[cc_number]);
+  fprintf(stderr, "set cc %i to %i\n", cc_number, (int) instance.wrapper_cc[cc_number]);
 }
 
 static void load(char* filename) {
@@ -77,13 +79,13 @@ static void load(char* filename) {
   fprintf(stderr, "error while loading %s\n", filename);
 }
 
-void wrapper_add_cc(int cc_number, const char* display_name, const char* persist_name, int default_value) {
-  cc[cc_number] = default_value;
+void wrapper_add_cc(struct instance* _instance, int cc_number, const char* display_name, const char* persist_name, int default_value) {
+  instance.wrapper_cc[cc_number] = default_value;
   cc_persist_name[cc_number] = persist_name;
   GtkWidget* slider_box = gtk_vbox_new(FALSE, 0);
-  GtkObject* adj = gtk_adjustment_new(cc[cc_number], 0, 127, 1, 16, 0);
+  GtkObject* adj = gtk_adjustment_new(instance.wrapper_cc[cc_number], 0, 127, 1, 16, 0);
   cc_adjustment[cc_number] = GTK_ADJUSTMENT(adj);
-  g_signal_connect(adj, "value_changed", G_CALLBACK(cb_value_changed), &cc[cc_number]);
+  g_signal_connect(adj, "value_changed", G_CALLBACK(cb_value_changed), &instance.wrapper_cc[cc_number]);
   GtkWidget* label = gtk_label_new(display_name);
   gtk_box_pack_start(GTK_BOX(slider_box), label, FALSE, FALSE, FALSE);
   gtk_widget_show(label);
@@ -130,7 +132,7 @@ static void session_cb(jack_session_event_t *event, void *arg)
 static int process_cb(jack_nframes_t nframes, void* arg) {
   FOR(i, jack_num_ports) *jack_buf[i] = jack_port_get_buffer(jack_port[i], nframes);
   FOR(i, jack_num_ports) if (!jack_buf[i]) return 1;
-  plugin_process(nframes);
+  plugin_process(&instance, nframes);
   return 0;
 }
 
@@ -202,23 +204,30 @@ double wrapper_get_sample_rate(void) {
   return jack_get_sample_rate(jack_client);
 }
 
-void wrapper_add_audio_input(const char* name, float** buf) {
+void wrapper_add_audio_input(struct instance* _instance, const char* name, float** buf) {
   CHECK(jack_num_ports < MAX_NUM_PORTS, "too many ports");
   int i = jack_num_ports++;
   jack_port[i] = jack_port_register(jack_client, name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
   jack_buf[i] = (void**) buf;
 }
 
-void wrapper_add_audio_output(const char* name, float** buf) {
+void wrapper_add_audio_output(struct instance* _instance, const char* name, float** buf) {
   CHECK(jack_num_ports < MAX_NUM_PORTS, "too many ports");
   int i = jack_num_ports++;
   jack_port[i] = jack_port_register(jack_client, name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
   jack_buf[i] = (void**) buf;
 }
 
-void wrapper_add_midi_input(const char* name, void** buf) {
+void wrapper_add_midi_input(struct instance* _instance, const char* name, void** buf) {
   CHECK(jack_num_ports < MAX_NUM_PORTS, "too many ports");
   int i = jack_num_ports++;
   jack_port[i] = jack_port_register(jack_client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
   jack_buf[i] = (void**) buf;
+}
+
+int main(int argc, char** argv) {
+  wrapper_init(&argc, &argv, plugin_name, plugin_persistence_name);
+  plugin_init(&instance, wrapper_get_sample_rate());
+  wrapper_run();
+  plugin_destroy(&instance);
 }

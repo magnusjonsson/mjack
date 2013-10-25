@@ -6,6 +6,9 @@
 
 #include "wrapper.h"
 
+const char* plugin_name = "SawSynth";
+const char* plugin_persistence_name = "mjack_sawsynth";
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif 
@@ -100,7 +103,7 @@ static double shape(double x) {
   return fabs(x) < 1e-12 ? 1.0 : tanh(x) / x;
 }
 
-static double svf_tick_nonlinear(struct svf_state* state, double input, double freq, double q) {
+static double svf_tick_nonlinear(struct svf_state* state, double input, double freq, double q, double grit) {
   freq *= dt;
   if (freq > 0.499) {
     freq = 0.499;
@@ -128,7 +131,6 @@ static double svf_tick_nonlinear(struct svf_state* state, double input, double f
 
   double f = tan(0.5 * omega);
 
-  double grit = (1 + wrapper_cc[CC_GRIT]) * (2.0/127.0);
   grit *= grit;
   double half_delayed_input = (input + state->last_input) * 0.5;
   double fb = half_delayed_input - q * state->z1 - state->z2;
@@ -270,12 +272,11 @@ static double tick_osc_hat(struct osc_state* osc_state, double freq) {
 }
 #endif
 
-static double tick_osc_ln(struct osc_state* osc_state, double freq) {
+static double tick_osc_ln(struct osc_state* osc_state, double freq, double brightness) {
   osc_state->phase += freq * dt;
   if (osc_state->phase > 0.5) { osc_state->phase -= 1.0; }
   
-  double k = wrapper_cc[CC_BRIGHTNESS] / 128.0 + 0.5;
-  k = exp(-freq / (20000 * k * k * k * k * k * k));
+  double k = brightness;
   //static double lastk;
   //if (k != lastk) { printf("%lf\n", k); lastk = k; }
   double x = 1.0 + k * cos(osc_state->phase * 2 * 3.1415917);
@@ -285,25 +286,28 @@ static double tick_osc_ln(struct osc_state* osc_state, double freq) {
   return atan2(y,x) / k;
 }
 
-static double tick_osc(struct osc_state* osc_state, double freq) {
-  return tick_osc_ln(osc_state, freq);
+static double tick_osc(struct osc_state* osc_state, double freq, double brightness) {
+  return tick_osc_ln(osc_state, freq, brightness);
 }
 
-static void generate_audio(int start_frame, int end_frame) {
+static void generate_audio(struct instance* instance, int start_frame, int end_frame) {
   for (int i = start_frame; i < end_frame; ++i) {
     double lfo1 = tick_lfo(&lfo1_phase, lfo1_freq);
     double lfo2 = tick_lfo(&lfo2_phase, lfo2_freq);
-    double osc = tick_osc(&osc_state, osc_freq * exp(0.000 * lfo1 + 0.000 * lfo2));
-    double svf_freq = 440.0 * pow(2.0, (current_key - 69) / 12.0 * (wrapper_cc[CC_TRACKING] / 127.0) + (wrapper_cc[CC_CUTOFF] - 69 + 36) / 12.0);
-    double svf_q = 1.0 - wrapper_cc[CC_RESONANCE] / 127.0;
-    double svf = svf_tick_nonlinear(&svf_state, osc, svf_freq, svf_q);
+    double k = instance->wrapper_cc[CC_BRIGHTNESS] / 128.0 + 0.5;
+    double brightness = exp(-osc_freq / (20000 * k * k * k * k * k * k));
+    double osc = tick_osc(&osc_state, osc_freq * exp(0.000 * lfo1 + 0.000 * lfo2), brightness);
+    double svf_freq = 440.0 * pow(2.0, (current_key - 69) / 12.0 * (instance->wrapper_cc[CC_TRACKING] / 127.0) + (instance->wrapper_cc[CC_CUTOFF] - 69 + 36) / 12.0);
+    double svf_q = 1.0 - instance->wrapper_cc[CC_RESONANCE] / 127.0;
+    double svf_grit = (1 + instance->wrapper_cc[CC_GRIT]) * (2.0/127.0);
+    double svf = svf_tick_nonlinear(&svf_state, osc, svf_freq, svf_q, svf_grit);
     double env = svf_tick(&env_state, gain, env_freq, env_q);
-    double volume = wrapper_cc[CC_VOLUME] * wrapper_cc[CC_VOLUME] / (127.0 * 127.0) * 0.25;
+    double volume = instance->wrapper_cc[CC_VOLUME] * instance->wrapper_cc[CC_VOLUME] / (127.0 * 127.0) * 0.25;
     audio_out_buf[i] = svf * env * volume;
   }
 }
 
-void plugin_process(int nframes) {
+void plugin_process(struct instance* instance, int nframes) {
   jack_nframes_t num_events = jack_midi_get_event_count(midi_in_buf);
   int sample_index = 0;
   FOR(e, num_events) {
@@ -311,26 +315,26 @@ void plugin_process(int nframes) {
     jack_midi_event_get(&event, midi_in_buf, e);
     handle_midi_event(&event);
     if (sample_index < event.time) {
-      generate_audio(sample_index, event.time);
+      generate_audio(instance, sample_index, event.time);
       sample_index = event.time;
     }
   }
   if (sample_index < nframes) {
-    generate_audio(sample_index, nframes);
+    generate_audio(instance, sample_index, nframes);
   }
 }
 
-int main(int argc, char** argv) {
-  wrapper_init(&argc, &argv, "sawsynth", "mjack_sawsynth");
-  init(wrapper_get_sample_rate());
-  wrapper_add_midi_input("midi in", &midi_in_buf);
-  wrapper_add_audio_output("audio out", &audio_out_buf);
-  wrapper_add_cc(CC_VOLUME, "Volume", "volume", 64);
-  wrapper_add_cc(CC_CUTOFF, "Cutoff", "cutoff", 64);
-  wrapper_add_cc(CC_RESONANCE, "Resonance", "resonance", 64);
-  wrapper_add_cc(CC_GRIT, "Grit", "grit", 0);
-  wrapper_add_cc(CC_BRIGHTNESS, "Brightness", "brightness", 0);
-  wrapper_add_cc(CC_TRACKING, "Tracking", "tracking", 64);
-  wrapper_run();
-  return 0;
+void plugin_init(struct instance* instance, double sample_rate) {
+  init(sample_rate);
+  wrapper_add_midi_input(instance, "midi in", &midi_in_buf);
+  wrapper_add_audio_output(instance, "audio out", &audio_out_buf);
+  wrapper_add_cc(instance, CC_VOLUME, "Volume", "volume", 64);
+  wrapper_add_cc(instance, CC_CUTOFF, "Cutoff", "cutoff", 64);
+  wrapper_add_cc(instance, CC_RESONANCE, "Resonance", "resonance", 64);
+  wrapper_add_cc(instance, CC_GRIT, "Grit", "grit", 0);
+  wrapper_add_cc(instance, CC_BRIGHTNESS, "Brightness", "brightness", 0);
+  wrapper_add_cc(instance, CC_TRACKING, "Tracking", "tracking", 64);
+}
+
+void plugin_destroy(struct instance* instance) {
 }

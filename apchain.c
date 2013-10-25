@@ -2,27 +2,30 @@
 #include <limits.h>
 #include <unistd.h>
 #include <math.h>
+#include <malloc.h>
 #include "wrapper.h"
+
+const char* plugin_name = "APChain";
+const char* plugin_persistence_name = "mjack_apchain";
 
 #define NUM_STAGES 16
 #define FOR(var,limit) for(int var = 0; var < limit; ++var)
-
-static float* inbuf;
-static float* outbuf;
-
-static double dt;
-
 #define CC_CUTOFF 77
 
-static double apstate[NUM_STAGES];
+struct apchain {
+  float* inbuf;
+  float* outbuf;
 
-static void init(double nframes_per_second) {
-  fprintf(stderr, "initializing, sample rate = %f\n", nframes_per_second);
-  dt = 1.0 / nframes_per_second;
+  double dt;
+
+  double apstate[NUM_STAGES];
+};
+
+static void init(struct apchain* a, double nframes_per_second) {
+  a->dt = 1.0 / nframes_per_second;
 }
 
-
-static double calc_apcoeff() {
+static double calc_apcoeff(double freq) {
     /*
 
       H(s) = (1 - s/w) / (1 + s/w)
@@ -64,9 +67,6 @@ static double calc_apcoeff() {
      Y/X = (k - z^-1) / (1 - kz^-1)
    */
 
-  double freq = 440.0 * pow(2.0, (cc[CC_CUTOFF] - 69 + 32) / 12.0);
-  //printf("freq = %s\n", freq);
-  freq *= dt;
   if (freq > 0.49) freq = 0.49;
   double w_digital = 2 * 3.141592 * freq;
   double w_analog = 2 * tan(w_digital / 2);
@@ -82,23 +82,29 @@ static double ap_tick(double* state, double in, double apcoeff) {
   return out;
 }
 
-static void process(int nframes) {
+void plugin_process(struct instance* instance, int nframes) {
+  struct apchain *a = instance->plugin;
+  double freq = 440.0 * pow(2.0, (instance->wrapper_cc[CC_CUTOFF] - 69 + 32) / 12.0);
+  double apcoeff = calc_apcoeff(freq * a->dt);
   FOR(f, nframes) {
-    double apcoeff = calc_apcoeff();
-    double x = inbuf[f] + 1e-12;
+    double x = a->inbuf[f] + 1e-12;
     FOR(s, NUM_STAGES) {
-      x = ap_tick(&apstate[s], x, apcoeff);
+      x = ap_tick(&a->apstate[s], x, apcoeff);
     }
-    outbuf[f] = x;
+    a->outbuf[f] = x;
   }
 }
 
-int main(int argc, char** argv) {
-  wrapper_init(&argc, &argv, "APChain", "mjack_apchain");
-  init(wrapper_get_sample_rate());
-  wrapper_add_audio_input("in", &inbuf);
-  wrapper_add_audio_output("out", &outbuf);
-  wrapper_add_cc(CC_CUTOFF, "Cutoff", "cutoff", 64);
-  wrapper_run();
-  return 0;
+void plugin_init(struct instance* instance, double sample_rate) {
+  struct apchain *a = calloc(1, sizeof(struct apchain));
+  instance->plugin = a;
+  init(a, sample_rate);
+  wrapper_add_audio_input(instance, "in", &a->inbuf);
+  wrapper_add_audio_output(instance, "out", &a->outbuf);
+  wrapper_add_cc(instance, CC_CUTOFF, "Cutoff", "cutoff", 64);
+}
+
+void plugin_destroy(struct instance* instance) {
+  free(instance->plugin);
+  instance->plugin = NULL;
 }
