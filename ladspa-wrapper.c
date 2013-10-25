@@ -117,9 +117,9 @@ static LADSPA_Descriptor descriptor = {
   .UniqueID = '?',
   .Label = "Nolabel",
   .Name = "Noname",
-  .Properties = LADSPA_PROPERTY_REALTIME | LADSPA_PROPERTY_INPLACE_BROKEN | LADSPA_PROPERTY_HARD_RT_CAPABLE,
-  .Maker = "Nomaker",
-  .Copyright = "Unknown",
+  .Properties = LADSPA_PROPERTY_REALTIME | LADSPA_PROPERTY_HARD_RT_CAPABLE,
+  .Maker = "Magnus Jonsson",
+  .Copyright = "2013 Magnus Jonsson",
   .PortCount = 0,
   .PortDescriptors = port_descriptors,
   .PortNames = port_names,
@@ -135,12 +135,13 @@ static LADSPA_Descriptor descriptor = {
   .cleanup = cleanup,
 };
 
-const LADSPA_Descriptor *ladspa_descriptor(unsigned long index) {
+__attribute__ ((visibility ("default")))
+const LADSPA_Descriptor *ladspa_descriptor(unsigned long index)  {
   if (index != 0) return NULL;
   struct instance *instance = instantiate(NULL, 0.0);
-  //descriptor.UniqueID = plugin_ladspa_unique_id;
-  //descriptor.Label = plugin_ladspa_label;
-  //descriptor.Name = plugin_ladspa_name;
+  descriptor.UniqueID = plugin_ladspa_unique_id;
+  descriptor.Label = plugin_name;
+  descriptor.Name = plugin_name;
   struct wrapper *w = instance->wrapper;
   descriptor.PortCount = w->num_ports;
   cleanup(instance);

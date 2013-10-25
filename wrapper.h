@@ -18,5 +18,4 @@ extern void plugin_process(struct instance* instance, int nframes);
 
 extern const char* plugin_name;
 extern const char* plugin_persistence_name;
-extern unsigned long plugin_ladspa_unique_id;
-extern const char* plugin_ladspa_label;
+extern const unsigned plugin_ladspa_unique_id;

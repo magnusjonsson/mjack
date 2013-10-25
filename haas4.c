@@ -2,10 +2,12 @@
 #include <limits.h>
 #include <unistd.h>
 #include <malloc.h>
+#include <stdint.h>
 #include "wrapper.h"
 
 const char* plugin_name = "Haas4";
 const char* plugin_persistence_name = "mjack_haas4";
+const unsigned plugin_ladspa_unique_id = 1;
 
 #define NUM_INS 4
 #define NUM_OUTS 2
@@ -64,5 +66,5 @@ void plugin_init(struct instance* instance, double sample_rate) {
 
 void plugin_destroy(struct instance* instance) {
   free(instance->plugin);
-  free(instance);
+  instance->plugin = NULL;
 }

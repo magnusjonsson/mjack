@@ -1,4 +1,4 @@
-CFLAGS=-Wall -O3 -std=c99 -ffast-math -ftree-vectorize -funroll-loops -D_GNU_SOURCE
+CFLAGS=-Wall -O3 -std=c99 -ffast-math -ftree-vectorize -funroll-loops -D_GNU_SOURCE -Xlinker -no-undefined
 TARGETS= haas4-jack-gtk haas4-ladspa.so reverb-jack-gtk reverb-ladspa.so sawsynth apchain-jack-gtk apchain-ladspa.so
 
 all : ${TARGETS}

@@ -7,6 +7,7 @@
 
 const char* plugin_name = "APChain";
 const char* plugin_persistence_name = "mjack_apchain";
+const unsigned plugin_ladspa_unique_id = 2;
 
 #define NUM_STAGES 16
 #define FOR(var,limit) for(int var = 0; var < limit; ++var)
