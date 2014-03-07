@@ -20,6 +20,8 @@ const unsigned plugin_ladspa_unique_id = 3;
 #define CC_WET_LEVEL 91
 #define CC_FEEDBACK 72
 #define CC_DECAY 80
+#define CC_DAMPING 81
+#define CC_STAGES 127 // TODO assign
 
 #define BUF_LEN 32
 
@@ -66,18 +68,20 @@ static void init(struct reverb* r, double nframes_per_second) {
   init_buf_offs(r);
 }
 
-static void mix4(struct reverb* r, int s, int n, double k) {
-  k *= 0.25;
+static double z[NUM_STAGES];
+
+static void mix4(struct reverb* r, int s, int n, double k, double a) {
   FOR(i, n) {
     float t0 = r->buf[s][0][i];
     float t1 = r->buf[s][1][i];
     float t2 = r->buf[s][2][i];
     float t3 = r->buf[s][3][i];
-    double m = (t0 + t1 + t2 + t3) * k;
-    r->buf[s][0][i] = t0 - m;
-    r->buf[s][1][i] = t1 - m;
-    r->buf[s][2][i] = t2 - m;
-    r->buf[s][3][i] = t3 - m;
+    double T = (t0 + t1 + t2 + t3) * 0.25;
+    z[s] += (T - z[s]) * a;
+    r->buf[s][0][i] = t0 - T - z[s] * k;
+    r->buf[s][1][i] = t1 - T - z[s] * k;
+    r->buf[s][2][i] = t2 - T - z[s] * k;
+    r->buf[s][3][i] = t3 - T - z[s] * k;
   }
 }
 
@@ -103,6 +107,46 @@ static void mix8(struct reverb* r, int s, int n, double k) {
     r->buf[s][7][i] = t7 - m;
   }
 }
+\
+static void mix16(struct reverb* r, int s, int n, double k) {
+  k *= 0.0625;
+  FOR(i, n) {
+    double t0 = r->buf[s][0][i];
+    double t1 = r->buf[s][1][i];
+    double t2 = r->buf[s][2][i];
+    double t3 = r->buf[s][3][i];
+    double t4 = r->buf[s][4][i];
+    double t5 = r->buf[s][5][i];
+    double t6 = r->buf[s][6][i];
+    double t7 = r->buf[s][7][i];
+    double t8 = r->buf[s][8][i];
+    double t9 = r->buf[s][9][i];
+    double t10 = r->buf[s][10][i];
+    double t11 = r->buf[s][11][i];
+    double t12 = r->buf[s][12][i];
+    double t13 = r->buf[s][13][i];
+    double t14 = r->buf[s][14][i];
+    double t15 = r->buf[s][15][i];
+    double m = (t0 + t1 + t2 + t3 + t4 + t5 + t6 + t7 + t8 + t9 + t10 + t11 + t12 + t13 + t14 + t15) * k;
+    r->buf[s][0][i] = t0 - m;
+    r->buf[s][1][i] = t1 - m;
+    r->buf[s][2][i] = t2 - m;
+    r->buf[s][3][i] = t3 - m;
+    r->buf[s][4][i] = t4 - m;
+    r->buf[s][5][i] = t5 - m;
+    r->buf[s][6][i] = t6 - m;
+    r->buf[s][7][i] = t7 - m;
+    r->buf[s][8][i] = t8 - m;
+    r->buf[s][9][i] = t9 - m;
+    r->buf[s][10][i] = t10 - m;
+    r->buf[s][11][i] = t11 - m;
+    r->buf[s][12][i] = t12 - m;
+    r->buf[s][13][i] = t13 - m;
+    r->buf[s][14][i] = t14 - m;
+    r->buf[s][15][i] = t15 - m;
+  }
+}
+
 static double square(double x) {
   return x * x;
 }
@@ -111,7 +155,9 @@ void plugin_process(struct instance* instance, int nframes) {
   struct reverb* r = instance->plugin;
   double reverb_gain = square(instance->wrapper_cc[CC_WET_LEVEL] * (2.0 / 127.0));
   double feedback_gain = -square(instance->wrapper_cc[CC_FEEDBACK] / 127.0);
-  double reflection_gain = 1.0 + instance->wrapper_cc[CC_DECAY] / 127.0;
+  double decay_gain = instance->wrapper_cc[CC_DECAY] / 127.0;
+  double damping_coeff = instance->wrapper_cc[CC_DAMPING] / 127.0; // TODO sample-rate depending
+  int stage = instance->wrapper_cc[CC_STAGES] * (NUM_STAGES / 2) / 128;
   int io_base = 0;
   while (nframes > 0) {
     int n = nframes;
@@ -134,7 +180,7 @@ void plugin_process(struct instance* instance, int nframes) {
     FOR(i, n) {
       double out[NUM_OUTS];
       FOR(o, NUM_OUTS) {
-	out[o] = reverb_gain * r->buf[NUM_STAGES/2*o][0][i];
+	out[o] = reverb_gain * r->buf[NUM_STAGES/2*o+stage][0][i];
 	r->buf[NUM_STAGES/2*o][0][i] *= feedback_gain;
 	r->buf[NUM_STAGES/2*o][0][i] += r->inbufs[o][io_base + i];
       }
@@ -142,8 +188,9 @@ void plugin_process(struct instance* instance, int nframes) {
 	r->outbufs[o^1][io_base + i] = out[o];
       }
     }
-    if (MIX_SIZE == 4) FOR(s, NUM_STAGES) mix4(r, s, n, reflection_gain);
-    if (MIX_SIZE == 8) FOR(s, NUM_STAGES) mix8(r, s, n, reflection_gain);
+    if (MIX_SIZE == 4) FOR(s, NUM_STAGES) mix4(r, s, n, decay_gain, damping_coeff);
+    if (MIX_SIZE == 8) FOR(s, NUM_STAGES) mix8(r, s, n, 1 + decay_gain);
+    if (MIX_SIZE == 16) FOR(s, NUM_STAGES) mix16(r, s, n, 1 + decay_gain);
     FOR(s, NUM_STAGES) {
       FOR(m, MIX_SIZE) {
 	int j = r->base - r->buf_offs[s][m];
@@ -180,6 +227,8 @@ void plugin_init(struct instance* instance, double sample_rate) {
   wrapper_add_cc(instance, CC_WET_LEVEL, "Wet", "wet", 64);
   wrapper_add_cc(instance, CC_FEEDBACK, "Feedback", "feedback", 64);
   wrapper_add_cc(instance, CC_DECAY, "Decay", "decay", 64);
+  wrapper_add_cc(instance, CC_DAMPING, "Damping", "damping", 64);
+  wrapper_add_cc(instance, CC_STAGES, "Stages", "stages", 64);
 }
 
 void plugin_destroy(struct instance* instance) {

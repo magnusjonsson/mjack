@@ -35,15 +35,10 @@ static double dt;
 
 // dsp control values
 static double gain;
-static double lfo1_freq;
-static double lfo2_freq;
 static double osc_freq;
 static double env_freq;
-static double env_q;
 
 // dsp state
-static double lfo1_phase;
-static double lfo2_phase;
 struct osc_state {
   double phase;
   double delayed_out;
@@ -55,8 +50,9 @@ struct svf_state {
 };
 
 static struct svf_state svf_state;
-static struct svf_state env_state;
+static double env_state;
 
+#if 0
 static double svf_tick(struct svf_state* state, double input, double freq, double q) {
   freq *= dt;
   if (freq > 0.499) {
@@ -98,7 +94,7 @@ static double svf_tick(struct svf_state* state, double input, double freq, doubl
 
   return lp;
 }
-
+#endif
 static double shape(double x) {
   return fabs(x) < 1e-12 ? 1.0 : tanh(x) / x;
 }
@@ -156,8 +152,6 @@ static double svf_tick_nonlinear(struct svf_state* state, double input, double f
 
 static void init(double sample_rate) {
   dt = 1.0 / sample_rate;
-  lfo1_freq = 5.0;
-  lfo2_freq = 0.32195813;
   printf("dt = %lg\n", dt);
 }
 static void handle_midi_note_off(int key, int velocity) {
@@ -176,8 +170,7 @@ static void handle_midi_note_on(int key, int velocity) {
     ++key_count_pressed;
     current_key = key;
     osc_freq = 440.0 * pow(2.0, (key - 69) / 12.0);
-    env_freq = osc_freq * 1;
-    env_q = 1.0;
+    env_freq = osc_freq * 1.0;
     gain = velocity / 127.0;
   }
 }
@@ -195,20 +188,6 @@ static void handle_midi_event(const jack_midi_event_t* event) {
     }
     break;
   }
-}
-
-static double tick_lfo(double* lfo_phase, double lfo_freq) {
-  *lfo_phase += lfo_freq * dt;
-  if (*lfo_phase > 0.5) {
-    *lfo_phase -= 1.0;
-  }
-  double lfo = *lfo_phase * 4;
-  if (lfo > 1.0) {
-    lfo = 2 - lfo;
-  } else if (lfo < -1.0) {
-    lfo = -2 - lfo;
-  }
-  return lfo;
 }
 
 /*
@@ -275,6 +254,7 @@ static double tick_osc_hat(struct osc_state* osc_state, double freq) {
 static double tick_osc_ln(struct osc_state* osc_state, double freq, double brightness) {
   osc_state->phase += freq * dt;
   if (osc_state->phase > 0.5) { osc_state->phase -= 1.0; }
+  return osc_state->phase;
   
   double k = brightness;
   //static double lastk;
@@ -291,18 +271,16 @@ static double tick_osc(struct osc_state* osc_state, double freq, double brightne
 }
 
 static void generate_audio(struct instance* instance, int start_frame, int end_frame) {
+  double k = instance->wrapper_cc[CC_BRIGHTNESS] / 128.0 + 0.5;
+  double brightness = exp(-osc_freq / (20000 * k * k * k * k * k * k));
+  double svf_freq = 440.0 * pow(2.0, (current_key - 69) / 12.0 * (instance->wrapper_cc[CC_TRACKING] / 127.0) + (instance->wrapper_cc[CC_CUTOFF] - 69 + 24 + 4) / 12.0);
+  double svf_q = 1.0 - instance->wrapper_cc[CC_RESONANCE] / 127.0;
+  double svf_grit = (1 + instance->wrapper_cc[CC_GRIT]) * (2.0/127.0);
+  double volume = instance->wrapper_cc[CC_VOLUME] * instance->wrapper_cc[CC_VOLUME] / (127.0 * 127.0) * 0.25;
   for (int i = start_frame; i < end_frame; ++i) {
-    double lfo1 = tick_lfo(&lfo1_phase, lfo1_freq);
-    double lfo2 = tick_lfo(&lfo2_phase, lfo2_freq);
-    double k = instance->wrapper_cc[CC_BRIGHTNESS] / 128.0 + 0.5;
-    double brightness = exp(-osc_freq / (20000 * k * k * k * k * k * k));
-    double osc = tick_osc(&osc_state, osc_freq * exp(0.000 * lfo1 + 0.000 * lfo2), brightness);
-    double svf_freq = 440.0 * pow(2.0, (current_key - 69) / 12.0 * (instance->wrapper_cc[CC_TRACKING] / 127.0) + (instance->wrapper_cc[CC_CUTOFF] - 69 + 36) / 12.0);
-    double svf_q = 1.0 - instance->wrapper_cc[CC_RESONANCE] / 127.0;
-    double svf_grit = (1 + instance->wrapper_cc[CC_GRIT]) * (2.0/127.0);
-    double svf = svf_tick_nonlinear(&svf_state, osc, svf_freq, svf_q, svf_grit);
-    double env = svf_tick(&env_state, gain, env_freq, env_q);
-    double volume = instance->wrapper_cc[CC_VOLUME] * instance->wrapper_cc[CC_VOLUME] / (127.0 * 127.0) * 0.25;
+    double osc = tick_osc(&osc_state, osc_freq, brightness);
+    double env = env_state += (gain - env_state) * 2 * 3.141592 * env_freq * dt;
+    double svf = svf_tick_nonlinear(&svf_state, osc, svf_freq * (1+10*env), svf_q, svf_grit);
     audio_out_buf[i] = svf * env * volume;
   }
 }
