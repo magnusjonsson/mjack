@@ -82,18 +82,18 @@ static void load(char* filename) {
 void wrapper_add_cc(struct instance* _instance, int cc_number, const char* display_name, const char* persist_name, int default_value) {
   instance.wrapper_cc[cc_number] = default_value;
   cc_persist_name[cc_number] = persist_name;
-  GtkWidget* slider_box = gtk_vbox_new(FALSE, 0);
+  GtkWidget* slider_box = gtk_hbox_new(FALSE, 0);
   GtkObject* adj = gtk_adjustment_new(instance.wrapper_cc[cc_number], 0, 127, 1, 16, 0);
   cc_adjustment[cc_number] = GTK_ADJUSTMENT(adj);
   g_signal_connect(adj, "value_changed", G_CALLBACK(cb_value_changed), &instance.wrapper_cc[cc_number]);
   GtkWidget* label = gtk_label_new(display_name);
   gtk_box_pack_start(GTK_BOX(slider_box), label, FALSE, FALSE, FALSE);
   gtk_widget_show(label);
-  GtkWidget* vscale = gtk_vscale_new(GTK_ADJUSTMENT(adj));
-  gtk_widget_set_size_request(vscale, 20, 300);
-  gtk_scale_set_digits(GTK_SCALE(vscale), 0);
-  gtk_box_pack_start(GTK_BOX(slider_box), vscale, FALSE, FALSE, FALSE);
-  gtk_widget_show(vscale);
+  GtkWidget* scale = gtk_hscale_new(GTK_ADJUSTMENT(adj));
+  gtk_widget_set_size_request(scale, 300, 30);
+  gtk_scale_set_digits(GTK_SCALE(scale), 0);
+  gtk_box_pack_start(GTK_BOX(slider_box), scale, FALSE, FALSE, FALSE);
+  gtk_widget_show(scale);
   gtk_box_pack_start(GTK_BOX(sliders_box), slider_box, FALSE, FALSE, FALSE);
   gtk_widget_show(slider_box);
 }
@@ -172,7 +172,7 @@ void wrapper_init(int* argc, char*** argv, const char* title, const char* name) 
                            G_CALLBACK(gtk_main_quit), NULL);
   gtk_window_set_title(GTK_WINDOW(window), title);
   gtk_window_set_default_size(GTK_WINDOW(window), 300, 200);
-  sliders_box = gtk_hbox_new(FALSE, 100);
+  sliders_box = gtk_vbox_new(FALSE, 0);
   gtk_container_add(GTK_CONTAINER(window), sliders_box);
 
   jack_client = jack_client_open(name, JackSessionID, &jack_status, option_uuid);
