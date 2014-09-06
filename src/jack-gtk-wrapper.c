@@ -5,7 +5,7 @@
 #include <jack/jack.h>
 #include <jack/session.h>
 #include <gtk/gtk.h>
-#include <json/json.h>
+#include <json.h>
 
 typedef jack_port_t port_t;
 typedef jack_port_t port_t;
@@ -136,6 +136,16 @@ static int process_cb(jack_nframes_t nframes, void* arg) {
   return 0;
 }
 
+static void randomize() {
+  FOR(i, 128) {
+    if (cc_adjustment[i]) {
+      int v = rand()%128;
+      gtk_adjustment_set_value(cc_adjustment[i], v);
+      //instance.wrapper_cc[i] = v;
+    }
+  }
+}
+
 void wrapper_init(int* argc, char*** argv, const char* title, const char* name) {
   gtk_init(argc, argv);
   program_name = (*argv)[0];
@@ -174,6 +184,11 @@ void wrapper_init(int* argc, char*** argv, const char* title, const char* name) 
   gtk_window_set_default_size(GTK_WINDOW(window), 300, 200);
   sliders_box = gtk_vbox_new(FALSE, 0);
   gtk_container_add(GTK_CONTAINER(window), sliders_box);
+  GtkWidget *button = gtk_button_new_with_label("Randomize");
+  gtk_signal_connect(GTK_OBJECT(button), "clicked",
+		     GTK_SIGNAL_FUNC(randomize), (gpointer) NULL);
+  gtk_container_add(GTK_CONTAINER(sliders_box), button);
+  gtk_widget_show(button);
 
   jack_client = jack_client_open(name, JackSessionID, &jack_status, option_uuid);
   CHECK(jack_client, "jack_client_open");

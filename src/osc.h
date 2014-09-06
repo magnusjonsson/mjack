@@ -12,7 +12,7 @@ static inline double osc_tick_box(struct osc* osc, double dt, double freq) {
     curr_out -= t;
     osc->phase -= 1.0;
   }
-  return curr_out;
+  return curr_out * 2;
 }
 
 static inline double osc_tick(struct osc* osc, double dt, double freq) {
