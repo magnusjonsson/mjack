@@ -107,7 +107,7 @@ static void mix8(struct reverb* r, int s, int n, double k) {
     r->buf[s][7][i] = t7 - m;
   }
 }
-\
+
 static void mix16(struct reverb* r, int s, int n, double k) {
   k *= 0.0625;
   FOR(i, n) {
