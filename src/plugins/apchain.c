@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <math.h>
 #include <malloc.h>
-#include "wrapper.h"
+#include "../wrappers/wrapper.h"
 
 const char* plugin_name = "APChain";
 const char* plugin_persistence_name = "mjack_apchain";

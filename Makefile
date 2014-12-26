@@ -50,10 +50,10 @@ install-ladspa : ${LADSPA_TARGETS}
 
 # Target rules
 
-%-ladspa.so : src/%.c src/ladspa-wrapper.c
+%-ladspa.so : src/plugins/%.c src/wrappers/ladspa-wrapper.c
 	gcc ${LADSPA_FLAGS} $^ -o $@
 
-%-jack-gtk : src/%.c src/jack-gtk-wrapper.c
+%-jack-gtk : src/plugins/%.c src/wrappers/jack-gtk-wrapper.c
 	gcc ${JACK_GTK_FLAGS} $^ -o $@
 
 # Misc

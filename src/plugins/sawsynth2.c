@@ -4,7 +4,7 @@
 #include <limits.h>
 #include <unistd.h>
 
-#include "wrapper.h"
+#include "../wrappers/wrapper.h"
 
 const char* plugin_name = "SawSynth";
 const char* plugin_persistence_name = "mjack_sawsynth";

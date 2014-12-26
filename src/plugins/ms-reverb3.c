@@ -5,7 +5,7 @@
 #include <math.h>
 #include <string.h>
 #include <malloc.h>
-#include "wrapper.h"
+#include "../wrappers/wrapper.h"
 
 const char* plugin_name = "Mid-Side Reverb 3";
 const char* plugin_persistence_name = "mjack_ms_reverb3";

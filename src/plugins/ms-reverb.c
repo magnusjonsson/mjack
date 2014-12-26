@@ -5,13 +5,13 @@
 #include <math.h>
 #include <string.h>
 #include <malloc.h>
-#include "wrapper.h"
+#include "../wrappers/wrapper.h"
 
-const char* plugin_name = "Reverb";
-const char* plugin_persistence_name = "mjack_reverb";
-const unsigned plugin_ladspa_unique_id = 3;
+const char* plugin_name = "Mid-Side Reverb";
+const char* plugin_persistence_name = "mjack_ms_reverb";
+const unsigned plugin_ladspa_unique_id = 9;
 
-#define NUM_INS 2
+#define NUM_INS 1
 #define NUM_OUTS 2
 
 #define NUM_STAGES 8
@@ -54,11 +54,6 @@ static void init_buf_offs(struct reverb* r) {
       r->buf_offs[s][m] = r->tank_len/NUM_STAGES * s + r->tank_len/NUM_STAGES/MIX_SIZE*m + irand(r->tank_len/NUM_STAGES/MIX_SIZE - BUF_LEN);
     }
   }
-  FOR(s, NUM_STAGES / 2) {
-    // make sure 1st reflection arrives at the same time in both speakers
-    r->buf_offs[NUM_STAGES/2 + s][0         ] = r->tank_len/2 + r->buf_offs[s][0         ];
-    r->buf_offs[NUM_STAGES/2 + s][MIX_SIZE-1] = r->tank_len/2 + r->buf_offs[s][MIX_SIZE-1];
-  }
 }
 
 static void init(struct reverb* r, double nframes_per_second) {
@@ -68,20 +63,20 @@ static void init(struct reverb* r, double nframes_per_second) {
   init_buf_offs(r);
 }
 
-static double z[NUM_STAGES];
+//static double z[NUM_STAGES];
 
-static void mix4(struct reverb* r, int s, int n, double k, double a) {
+static void mix4(struct reverb* r, int s, int n, double k) {
+  k *= 0.25;
   FOR(i, n) {
     float t0 = r->buf[s][0][i];
     float t1 = r->buf[s][1][i];
     float t2 = r->buf[s][2][i];
     float t3 = r->buf[s][3][i];
-    double T = (t0 + t1 + t2 + t3) * 0.25;
-    z[s] += (T - z[s]) * a;
-    r->buf[s][0][i] = t0 - T - z[s] * k;
-    r->buf[s][1][i] = t1 - T - z[s] * k;
-    r->buf[s][2][i] = t2 - T - z[s] * k;
-    r->buf[s][3][i] = t3 - T - z[s] * k;
+    double m = (t0 + t1 + t2 + t3) * k;
+    r->buf[s][0][i] = t0 - m;
+    r->buf[s][1][i] = t1 - m;
+    r->buf[s][2][i] = t2 - m;
+    r->buf[s][3][i] = t3 - m;
   }
 }
 
@@ -156,7 +151,7 @@ void plugin_process(struct instance* instance, int nframes) {
   double reverb_gain = square(instance->wrapper_cc[CC_WET_LEVEL] * (2.0 / 127.0));
   double feedback_gain = -square(instance->wrapper_cc[CC_FEEDBACK] / 127.0);
   double decay_gain = instance->wrapper_cc[CC_DECAY] / 127.0;
-  double damping_coeff = instance->wrapper_cc[CC_DAMPING] / 127.0; // TODO sample-rate depending
+  //double damping_coeff = instance->wrapper_cc[CC_DAMPING] / 127.0; // TODO sample-rate depending
   int stage = instance->wrapper_cc[CC_STAGES] * (NUM_STAGES / 2) / 128;
   int io_base = 0;
   while (nframes > 0) {
@@ -178,17 +173,19 @@ void plugin_process(struct instance* instance, int nframes) {
       }
     }
     FOR(i, n) {
-      double out[NUM_OUTS];
+      double mid = r->buf[0 + stage][0][i];
+      double side = r->buf[NUM_STAGES/2 + stage][0][i];
+      double left = reverb_gain * (mid - side);
+      double right = reverb_gain * (mid + side);
       FOR(o, NUM_OUTS) {
-	out[o] = reverb_gain * r->buf[NUM_STAGES/2*o+stage][0][i];
 	r->buf[NUM_STAGES/2*o][0][i] *= feedback_gain;
-	r->buf[NUM_STAGES/2*o][0][i] += r->inbufs[o][io_base + i];
+	r->buf[NUM_STAGES/2*o][0][i] += r->inbufs[0][io_base + i];
       }
-      FOR(o, NUM_OUTS) {
-	r->outbufs[o^1][io_base + i] = out[o];
-      }
+      r->outbufs[0][io_base + i] = left;
+      r->outbufs[1][io_base + i] = right;
     }
-    if (MIX_SIZE == 4) FOR(s, NUM_STAGES) mix4(r, s, n, decay_gain, damping_coeff);
+    //    if (MIX_SIZE == 2) FOR(s, NUM_STAGES) mix2(r, s, n, decay_gain, damping_coef
+    if (MIX_SIZE == 4) FOR(s, NUM_STAGES) mix4(r, s, n, 1 + decay_gain);
     if (MIX_SIZE == 8) FOR(s, NUM_STAGES) mix8(r, s, n, 1 + decay_gain);
     if (MIX_SIZE == 16) FOR(s, NUM_STAGES) mix16(r, s, n, 1 + decay_gain);
     FOR(s, NUM_STAGES) {
@@ -213,22 +210,27 @@ void plugin_process(struct instance* instance, int nframes) {
 }
 
 void plugin_init(struct instance* instance, double sample_rate) {
+  printf("plugin_init\n");
   struct reverb* r = memalign(4096, sizeof(struct reverb));
   memset(r, 0, sizeof(struct reverb));
   instance->plugin = r;
+  printf("init\n");
   init(r, sample_rate);
 #define MAX_NAME_LENGTH 16
   static char inname[NUM_INS][MAX_NAME_LENGTH];
   static char outname[NUM_OUTS][MAX_NAME_LENGTH];
   FOR(i, NUM_INS) snprintf(inname[i], MAX_NAME_LENGTH, "in %i", i);
   FOR(i, NUM_OUTS) snprintf(outname[i], MAX_NAME_LENGTH, "out %i", i);
+  printf("audio ports\n");
   FOR(i, NUM_INS) wrapper_add_audio_input(instance, inname[i], &r->inbufs[i]);
   FOR(i, NUM_OUTS) wrapper_add_audio_output(instance, outname[i], &r->outbufs[i]);
+  printf("CCs\n");
   wrapper_add_cc(instance, CC_WET_LEVEL, "Wet", "wet", 64);
   wrapper_add_cc(instance, CC_FEEDBACK, "Feedback", "feedback", 64);
   wrapper_add_cc(instance, CC_DECAY, "Decay", "decay", 64);
   wrapper_add_cc(instance, CC_DAMPING, "Damping", "damping", 64);
   wrapper_add_cc(instance, CC_STAGES, "Stages", "stages", 64);
+  printf("exit plugin_init\n");
 }
 
 void plugin_destroy(struct instance* instance) {

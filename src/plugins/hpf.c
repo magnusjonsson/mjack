@@ -4,11 +4,11 @@
 #include <malloc.h>
 #include <stdint.h>
 #include <math.h>
-#include "wrapper.h"
+#include "../wrappers/wrapper.h"
 
-const char* plugin_name = "LPF";
-const char* plugin_persistence_name = "mjack_lpf";
-const unsigned plugin_ladspa_unique_id = 8;
+const char* plugin_name = "HPF";
+const char* plugin_persistence_name = "mjack_hpf";
+const unsigned plugin_ladspa_unique_id = 4;
 
 #define CC_CUTOFF 80
 #define CC_ORDER 81
@@ -38,7 +38,7 @@ void plugin_process(struct instance* instance, int nframes) {
     double s = h->in[i];
     FOR(j, MAX_ORDER) {
       if (j < order) {
-	s = h->state[j] += (s - h->state[j]) * k;
+	s -= (h->state[j] += (s - h->state[j]) * k);
       } else {
 	h->state[j] = 0;
       }

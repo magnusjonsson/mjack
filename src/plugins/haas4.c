@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <malloc.h>
 #include <stdint.h>
-#include "wrapper.h"
+#include "../wrappers/wrapper.h"
 
 const char* plugin_name = "Haas4";
 const char* plugin_persistence_name = "mjack_haas4";

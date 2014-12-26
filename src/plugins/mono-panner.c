@@ -4,7 +4,7 @@
 #include <malloc.h>
 #include <stdint.h>
 #include <math.h>
-#include "wrapper.h"
+#include "../wrappers/wrapper.h"
 
 const char* plugin_name = "MonoPanner";
 const char* plugin_persistence_name = "mjack_mono_panner";

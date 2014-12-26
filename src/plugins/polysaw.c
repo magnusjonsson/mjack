@@ -9,14 +9,14 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#include "wrapper.h"
-#include "osc.h"
-#include "svf.h"
-#include "ladder.h"
-#include "ms20-filter.h"
-#include "lfo.h"
-#include "adsr-env.h"
-#include "simple-env.h"
+#include "../wrappers/wrapper.h"
+#include "../dsp/osc.h"
+#include "../dsp/svf.h"
+#include "../dsp/ladder.h"
+#include "../dsp/ms20-filter.h"
+#include "../dsp/lfo.h"
+#include "../dsp/adsr-env.h"
+#include "../dsp/simple-env.h"
 
 const char* plugin_name = "PolySaw";
 const char* plugin_persistence_name = "mjack_polysaw";
