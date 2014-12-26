@@ -1,5 +1,10 @@
-CFLAGS=-Wall -O3 -std=c99 -ffast-math -ftree-vectorize -funroll-loops -Xlinker -no-undefined -std=gnu99
-TARGETS= haas4-jack-gtk haas4-ladspa.so reverb-jack-gtk reverb-ladspa.so sawsynth sawsynth2 polysaw apchain-jack-gtk apchain-ladspa.so synth2 hpf-ladspa.so lpf-ladspa.so parametric-ladspa.so tanh-distortion-ladspa.so mono-panner-ladspa.so ladder_filter_designer ms-reverb-jack-gtk ms-reverb-ladspa.so
+CFLAGS := -Wall -O3 -std=c99 -ffast-math -ftree-vectorize -funroll-loops -Xlinker -no-undefined -std=gnu99
+
+LADSPA_TARGETS := haas4-ladspa.so reverb-ladspa.so apchain-ladspa.so hpf-ladspa.so lpf-ladspa.so parametric-ladspa.so tanh-distortion-ladspa.so mono-panner-ladspa.so ms-reverb-ladspa.so ms-reverb2-ladspa.so ms-reverb3-ladspa.so ms-gain-ladspa.so
+
+JACK_GTK_TARGETS := haas4-jack-gtk reverb-jack-gtk sawsynth sawsynth2 polysaw apchain-jack-gtk synth2 ms-reverb-jack-gtk ms-reverb2-jack-gtk ms-reverb3-jack-gtk
+
+TARGETS := ${LADSPA_TARGETS} ${JACK_GTK_TARGETS} ladder_filter_designer
 
 all : ${TARGETS}
 
@@ -56,12 +61,25 @@ dummylash : src/dummylash.c
 
 ms-reverb-jack-gtk : src/ms_reverb.c src/jack-gtk-wrapper.c src/wrapper.h 
 	gcc ${CFLAGS} src/ms_reverb.c src/jack-gtk-wrapper.c -o $@ `pkg-config --libs --cflags gtk+-2.0` -ljack `pkg-config --libs --cflags json-c` -lm
+ms-reverb2-jack-gtk : src/ms_reverb2.c src/jack-gtk-wrapper.c src/wrapper.h 
+	gcc ${CFLAGS} src/ms_reverb2.c src/jack-gtk-wrapper.c -o $@ `pkg-config --libs --cflags gtk+-2.0` -ljack `pkg-config --libs --cflags json-c` -lm
+
+ms-reverb3-jack-gtk : src/ms_reverb3.c src/jack-gtk-wrapper.c src/wrapper.h 
+	gcc ${CFLAGS} src/ms_reverb3.c src/jack-gtk-wrapper.c -o $@ `pkg-config --libs --cflags gtk+-2.0` -ljack `pkg-config --libs --cflags json-c` -lm
 
 ms-reverb-ladspa.so : src/ms_reverb.c src/ladspa-wrapper.c src/wrapper.h 
 	gcc ${CFLAGS} -fPIC -shared src/ms_reverb.c src/ladspa-wrapper.c -o $@ `pkg-config --libs --cflags gtk+-2.0` -ljack `pkg-config --libs --cflags json-c` -lm
 
+ms-reverb2-ladspa.so : src/ms_reverb2.c src/ladspa-wrapper.c src/wrapper.h 
+	gcc ${CFLAGS} -fPIC -shared src/ms_reverb2.c src/ladspa-wrapper.c -o $@ `pkg-config --libs --cflags gtk+-2.0` -ljack `pkg-config --libs --cflags json-c` -lm
 
-install-ladspa : reverb-ladspa.so hpf-ladspa.so lpf-ladspa.so parametric-ladspa.so tanh-distortion-ladspa.so mono-panner-ladspa.so ms-reverb-ladspa.so
+ms-reverb3-ladspa.so : src/ms_reverb3.c src/ladspa-wrapper.c src/wrapper.h 
+	gcc ${CFLAGS} -fPIC -shared src/ms_reverb3.c src/ladspa-wrapper.c -o $@ `pkg-config --libs --cflags gtk+-2.0` -ljack `pkg-config --libs --cflags json-c` -lm
+
+ms-gain-ladspa.so : src/ms_gain.c src/ladspa-wrapper.c src/wrapper.h
+	gcc ${CFLAGS} -fPIC -shared src/ms_gain.c src/ladspa-wrapper.c -o $@ -lm
+
+install-ladspa : ${LADSPA_TARGETS}
 	cp $^ /usr/local/lib/ladspa/
 
 ladder_filter_designer : src/ladder_filter_designer.c

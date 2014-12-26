@@ -219,7 +219,7 @@ void plugin_init(struct instance* instance, double sample_rate) {
   init(r, sample_rate);
 #define MAX_NAME_LENGTH 16
   static char inname[NUM_INS][MAX_NAME_LENGTH];
-  static char outname[NUM_INS][MAX_NAME_LENGTH];
+  static char outname[NUM_OUTS][MAX_NAME_LENGTH];
   FOR(i, NUM_INS) snprintf(inname[i], MAX_NAME_LENGTH, "in %i", i);
   FOR(i, NUM_OUTS) snprintf(outname[i], MAX_NAME_LENGTH, "out %i", i);
   FOR(i, NUM_INS) wrapper_add_audio_input(instance, inname[i], &r->inbufs[i]);

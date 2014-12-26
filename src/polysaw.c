@@ -106,7 +106,7 @@ static void handle_midi_note_off(int key, int velocity) {
   }
 }
 
-struct {
+const struct {
   int octaves;
   int fifths;
 } note_vector[12] = {
@@ -124,16 +124,34 @@ struct {
   {-2,5}, // B
 };
 
-static int next_voice;
+const double ji_ratio[12] = {
+  1.0,
+  17.0/16.0,
+  9.0/8.0,
+  19.0/16.0,
+  5.0/4.0,
+  21.0/16.0,
+  11.0/8.0,
+  3.0/2.0,
+  13.0/8.0,
+  27.0/16.0,
+  7.0/4.0,
+  15.0/8.0,
+};
 
 static double key_cents(struct instance *instance, int key) {
-  double OCTAVE_CENTS = 1200.0 + 0.1 * (instance->wrapper_cc[CC_OCTAVE]-64);
-  double FIFTH_CENTS = 700.0 + 0.1 * (instance->wrapper_cc[CC_FIFTH]-64);
-
   int note = key%12;
   int oct = key/12 - 5;
-  return (OCTAVE_CENTS * (oct + note_vector[note].octaves - note_vector[9].octaves) + FIFTH_CENTS * (note_vector[note].fifths - note_vector[9].fifths));
+  if (instance->wrapper_cc[CC_OCTAVE] == 0 && instance->wrapper_cc[CC_FIFTH] == 0) {
+    return 1200.0 * oct + 1200.0 * log(ji_ratio[note]) / log(2);
+  } else {
+    double OCTAVE_CENTS = 1200.0 + 0.1 * (instance->wrapper_cc[CC_OCTAVE]-64);
+    double FIFTH_CENTS = 700.0 + 0.1 * (instance->wrapper_cc[CC_FIFTH]-64);
+    return (OCTAVE_CENTS * (oct + note_vector[note].octaves - note_vector[9].octaves) + FIFTH_CENTS * (note_vector[note].fifths - note_vector[9].fifths));
+  }
 }
+
+static int next_voice;
 
 static void handle_midi_note_on(struct instance* instance, int key, int velocity) {
   if (!key_is_pressed[key]) {
@@ -208,7 +226,7 @@ static void generate_audio(struct instance* instance, int start_frame, int end_f
   //double svf2_q = 1.0 - instance->wrapper_cc[CC_VCF2_RESONANCE] / 127.0;
   double vcf1_clip_level = pow((instance->wrapper_cc[CC_VCF1_CLIP_LEVEL] + 1) / 64.0, 2);
   double vcf2_clip_level = pow((instance->wrapper_cc[CC_VCF2_CLIP_LEVEL] + 1) / 64.0, 2);
-  double volume = instance->wrapper_cc[CC_VOLUME] * instance->wrapper_cc[CC_VOLUME] / (127.0 * 127.0) * 0.25;
+  double volume = instance->wrapper_cc[CC_VOLUME] * instance->wrapper_cc[CC_VOLUME] / (127.0 * 127.0);
   double drift = pow(instance->wrapper_cc[CC_DRIFT], 2) * sqrt(dt);
   double lfo_delay = 10 * pow(instance->wrapper_cc[CC_LFO_DELAY] / 128.0, 2);
   double lfo_freq = 20 * pow(instance->wrapper_cc[CC_LFO_FREQ] / 128.0, 2);
