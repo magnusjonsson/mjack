@@ -13,10 +13,10 @@
 #include "osc.h"
 #include "svf.h"
 #include "ladder.h"
-#include "ms20_filter.h"
+#include "ms20-filter.h"
 #include "lfo.h"
-#include "adsr_env.h"
-#include "simple_env.h"
+#include "adsr-env.h"
+#include "simple-env.h"
 
 const char* plugin_name = "PolySaw";
 const char* plugin_persistence_name = "mjack_polysaw";

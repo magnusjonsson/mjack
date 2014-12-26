@@ -12,10 +12,10 @@
 #include "wrapper.h"
 #include "osc.h"
 #include "ladder.h"
-#include "ms20_filter.h"
+#include "ms20-filter.h"
 #include "lfo.h"
-#include "adsr_env.h"
-#include "simple_env.h"
+#include "adsr-env.h"
+#include "simple-env.h"
 #include "meantone.h"
 
 const char* plugin_name = "Synth2";
