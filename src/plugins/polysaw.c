@@ -80,10 +80,10 @@ static double env_freq[NUM_VOICES];
 // dsp state
 static struct osc osc[NUM_VOICES];
 
-static struct svf svf[NUM_VOICES];
+//static struct svf svf[NUM_VOICES];
 static struct ladder ladder[NUM_VOICES];
-static struct ms20_filter ms20_filter_1[NUM_VOICES];
-static struct ms20_filter ms20_filter_2[NUM_VOICES];
+//static struct ms20_filter ms20_filter_1[NUM_VOICES];
+//static struct ms20_filter ms20_filter_2[NUM_VOICES];
 
 static struct adsr_env vca_env[NUM_VOICES];
 static struct adsr_env vcf1_env[NUM_VOICES];
@@ -214,10 +214,10 @@ static void generate_audio(struct instance* instance, int start_frame, int end_f
   double vcf1_sustain = pow(instance->wrapper_cc[CC_VCF1_SUSTAIN] / 128.0, 2);
   double vcf1_release = pow(instance->wrapper_cc[CC_VCF1_RELEASE] / 128.0, 4) * 10000;
 
-  double vcf2_attack  = pow(instance->wrapper_cc[CC_VCF2_ATTACK] / 128.0, 4) * 10000;
-  double vcf2_decay   = pow(instance->wrapper_cc[CC_VCF2_DECAY] / 128.0, 4) * 10000;
-  double vcf2_sustain = pow(instance->wrapper_cc[CC_VCF2_SUSTAIN] / 128.0, 2);
-  double vcf2_release = pow(instance->wrapper_cc[CC_VCF2_RELEASE] / 128.0, 4) * 10000;
+  //double vcf2_attack  = pow(instance->wrapper_cc[CC_VCF2_ATTACK] / 128.0, 4) * 10000;
+  //double vcf2_decay   = pow(instance->wrapper_cc[CC_VCF2_DECAY] / 128.0, 4) * 10000;
+  //double vcf2_sustain = pow(instance->wrapper_cc[CC_VCF2_SUSTAIN] / 128.0, 2);
+  //double vcf2_release = pow(instance->wrapper_cc[CC_VCF2_RELEASE] / 128.0, 4) * 10000;
 
   double vcf_pregain = pow(instance->wrapper_cc[CC_VCF_PRE_GAIN] / 64.0, 2);
   double reso_1 = instance->wrapper_cc[CC_VCF1_RESONANCE] / 127.0;
@@ -225,7 +225,7 @@ static void generate_audio(struct instance* instance, int start_frame, int end_f
   //double svf1_q = 1.0 - instance->wrapper_cc[CC_VCF1_RESONANCE] / 127.0;
   //double svf2_q = 1.0 - instance->wrapper_cc[CC_VCF2_RESONANCE] / 127.0;
   double vcf1_clip_level = pow((instance->wrapper_cc[CC_VCF1_CLIP_LEVEL] + 1) / 64.0, 2);
-  double vcf2_clip_level = pow((instance->wrapper_cc[CC_VCF2_CLIP_LEVEL] + 1) / 64.0, 2);
+  //double vcf2_clip_level = pow((instance->wrapper_cc[CC_VCF2_CLIP_LEVEL] + 1) / 64.0, 2);
   double volume = instance->wrapper_cc[CC_VOLUME] * instance->wrapper_cc[CC_VOLUME] / (127.0 * 127.0);
   double drift = pow(instance->wrapper_cc[CC_DRIFT], 2) * sqrt(dt);
   double lfo_delay = 10 * pow(instance->wrapper_cc[CC_LFO_DELAY] / 128.0, 2);
@@ -235,15 +235,15 @@ static void generate_audio(struct instance* instance, int start_frame, int end_f
   double pw_lfo = 0.5 * instance->wrapper_cc[CC_PW_LFO] / 128.0;
   FOR(v, NUM_VOICES) {
     double svf1_freq = 440.0 * pow(osc_freq[v]/110.0, instance->wrapper_cc[CC_VCF1_TRACKING] / 127.0) * pow(2.0, (instance->wrapper_cc[CC_VCF1_CUTOFF] - 69 + 24 + 4) / 12.0);
-    double svf2_freq = 440.0 * pow(osc_freq[v]/110.0, instance->wrapper_cc[CC_VCF2_TRACKING] / 127.0) * pow(2.0, (instance->wrapper_cc[CC_VCF2_CUTOFF] - 69 + 24 + 4) / 12.0);
+    //double svf2_freq = 440.0 * pow(osc_freq[v]/110.0, instance->wrapper_cc[CC_VCF2_TRACKING] / 127.0) * pow(2.0, (instance->wrapper_cc[CC_VCF2_CUTOFF] - 69 + 24 + 4) / 12.0);
     for (int i = start_frame; i < end_frame; ++i) {
       double lfo_out = lfo_tick(&lfo[v], dt, lfo_delay, lfo_freq);
       double osc_out = osc_tick(&osc[v], dt, osc_freq[v] * (1 + osc_lfo * lfo_out) + (rand()*2.0/RAND_MAX - 1.0) * drift);
       osc_out = osc_out > pw + pw_lfo * lfo_out ? 0.6 : -0.6;
       double vcf1_env_out = adsr_env_tick(&vcf1_env[v], dt, vcf1_attack, vcf1_decay, vcf1_sustain, vcf1_release, gain[v], 2);
-      double vcf2_env_out = adsr_env_tick(&vcf2_env[v], dt, vcf2_attack, vcf2_decay, vcf2_sustain, vcf2_release, gain[v], 2);
+      //double vcf2_env_out = adsr_env_tick(&vcf2_env[v], dt, vcf2_attack, vcf2_decay, vcf2_sustain, vcf2_release, gain[v], 2);
       double f1 = svf1_freq * vcf1_env_out;
-      double f2 = svf2_freq / vcf2_env_out;
+      //double f2 = svf2_freq / vcf2_env_out;
       double svf_out_1 = ladder_tick(&ladder[v], dt, f1, 6 * reso_1, vcf1_clip_level, osc_out * vcf_pregain);
       //double svf_out_1 = svf_tick_nonlinear(&svf[v], dt, f1, svf1_q, osc_out * vcf_pregain);
       //double svf_out_1 = ms20_filter_tick_lp(&ms20_filter_1[v], dt, f1, reso_1, vcf1_clip_level, osc_out * vcf_pregain);

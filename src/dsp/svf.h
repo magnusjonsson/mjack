@@ -50,7 +50,7 @@ static inline double svf_shape(double x) {
   return fabs(x) < 1e-12 ? 1.0 : tanh(x) / x;
 }
 
-static double svf_tick_nonlinear(struct svf *state, double dt, double freq, double q, double input) {
+static inline double svf_tick_nonlinear(struct svf *state, double dt, double freq, double q, double input) {
   freq *= dt;
   if (freq > 0.499) {
     freq = 0.499;

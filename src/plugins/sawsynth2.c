@@ -115,7 +115,7 @@ static void handle_midi_event(const jack_midi_event_t* event) {
   }
 }
 
-static double tick_osc_square(struct osc_state* osc_state, double freq, double re, double im) {
+static inline double tick_osc_square(struct osc_state* osc_state, double freq, double re, double im) {
   double curr_output = osc_state->phase < 0 ? -1 : 1;
   lpf_tick(&osc_state->lpf, re, im, dt, curr_output);
 

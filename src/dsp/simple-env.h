@@ -3,16 +3,16 @@ struct simple_env {
   double smoothed;
 };
 
-static double simple_env_tick(struct simple_env *simple_env, double dt, double speed, double perc) {
+static inline double simple_env_tick(struct simple_env *simple_env, double dt, double speed, double perc) {
   simple_env->raw *= fmax(0.5, 1 - perc * dt);
   simple_env->smoothed += (simple_env->raw - simple_env->smoothed) * fmin(0.5, dt * speed);
   return simple_env->smoothed;
 }
 
-static void simple_env_trigger(struct simple_env *simple_env) {
+static inline void simple_env_trigger(struct simple_env *simple_env) {
   simple_env->raw = 1;
 }
 
-static void simple_env_untrigger(struct simple_env *simple_env) {
+static inline void simple_env_untrigger(struct simple_env *simple_env) {
   simple_env->raw = 0;
 }
