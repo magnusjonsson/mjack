@@ -56,8 +56,8 @@ static void save(char* filename) {
 }
 
 static void load_cc(struct json_object* cc_obj, int cc_number, const char* name) {
-  struct json_object* tmp = json_object_object_get(cc_obj, name);
-  if (!tmp) {
+  struct json_object *tmp = NULL;
+  if (!json_object_object_get_ex(cc_obj, name, &tmp) || !tmp) {
     fprintf(stderr, "Could not load cc %i (%s)\n", cc_number, name);
     return;
   }
@@ -70,8 +70,8 @@ static void load(char* filename) {
   fprintf(stderr, "loading %s\n", filename);
   struct json_object* obj = json_object_from_file(filename);
   if (!obj) goto error;
-  struct json_object* cc_obj = json_object_object_get(obj, "cc");
-  if (!cc_obj) goto error;
+  struct json_object* cc_obj = NULL;
+  if (!json_object_object_get_ex(obj, "cc", &cc_obj) || !cc_obj) goto error;
   FOR(i, 128) if (cc_persist_name[i]) load_cc(cc_obj, i, cc_persist_name[i]);
   json_object_put(obj);
   return;
