@@ -5,8 +5,8 @@
 #include <unistd.h>
 #include "../wrappers/wrapper.h"
 
-const char* plugin_name = "SawSynth";
-const char* plugin_persistence_name = "mjack_sawsynth";
+const char* plugin_name = "SawSynth3";
+const char* plugin_persistence_name = "mjack_sawsynth3";
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -30,20 +30,21 @@ static double dt;
 #define CC_RESONANCE 71
 #define CC_TRACKING 80
 #define CC_GRIT 75
-#define CC_PORTAMENTO 81
-#define CC_ENVELOPE 82
+#define CC_DETUNE 76
 
 // dsp control values
 static double gain;
-static double osc_target_freq;
 static double osc_freq;
+static double env_freq;
 
 // dsp state
 struct osc_state {
   double phase;
   double delayed_out;
 };
-static struct osc_state osc_state;
+static struct osc_state osc1_state;
+static struct osc_state osc2_state;
+
 struct svf_state {
   double last_input;
   double z1, z2;
@@ -169,7 +170,8 @@ static void handle_midi_note_on(int key, int velocity) {
     key_is_pressed[key] = 1;
     ++key_count_pressed;
     current_key = key;
-    osc_target_freq = 440.0 * pow(2.0, (key - 69) / 12.0);
+    osc_freq = 440.0 * pow(2.0, (key - 69) / 12.0);
+    env_freq = osc_freq * 1.0;
     gain = velocity / 127.0;
   }
 }
@@ -189,67 +191,6 @@ static void handle_midi_event(const jack_midi_event_t* event) {
   }
 }
 
-/*
-static double tick_osc_box(struct osc_state* osc_state, double freq) {
-  double phase_inc = freq * dt;
-  double curr_out = osc_state->phase + (1.0/2.0) * phase_inc;
-  osc_state->phase += phase_inc;
-  while (osc_state->phase > 0.5) {
-    double t = (osc_state->phase - 0.5) / phase_inc;
-    curr_out -= t;
-    osc_state->phase -= 1.0;
-  }
-  return curr_out;
-}
-*/
-#if 0
-static double tick_osc_hat(struct osc_state* osc_state, double freq) {
-  double phase_inc = freq * dt;
-  /*
-    A saw filtered by a hat filter with
-    impulse response f(t):
-    
-    f(t) = t   (0 <= t <= 1)
-           2-t (1 <= t <= 2)
-           0   elsewhere
-
-    Scribblings:
-    
-    integral[0..1] (a+bt) * (1 - t) dt =
-    integral[0..1] (a + (b-a)t - b*t^2 dt =
-    [0..1] (a*t + (b-a)*t^2/2 - b*t^3/3) =
-    a + (b-a)/2 - b/3 =
-    a/2 + b/6
-
-    integral[0..1] (a+bt) * t dt =
-    integral[0..1] at + bt^2 dt =
-    [0..1] (a*t^2/2 + b*t^3/3 dt =
-    a/2 + b/3
-
-    integral[A..B] (1-t) dt =
-    [A..B] (t - t^2/2)
-
-    a(B-A) (b-a)(B^2-A^2)/2 - b(B^3 - A^3)/3
-
-    integral[A..B] t dt =
-    [A..B] (t^2/2) =
-    a(B^2-A^2)/2
-   */
-  double next_out = (1.0/2.0) * osc_state->phase + (1.0/3.0) * phase_inc;
-  double curr_out = (1.0/2.0) * osc_state->phase + (1.0/6.0) * phase_inc;
-  osc_state->phase += phase_inc;
-  while (osc_state->phase > 0.5) {
-    double t = (osc_state->phase - 0.5) / phase_inc;
-    curr_out -= (1.0/2.0) * (t*t);
-    next_out -= t - (1.0/2.0) * (t*t);
-    osc_state->phase -= 1.0;
-  }
-  curr_out += osc_state->delayed_out;
-  osc_state->delayed_out = next_out;
-  return curr_out;
-}
-#endif
-
 static double tick_osc_raw(struct osc_state* osc_state, double freq) {
   osc_state->phase += freq * dt;
   if (osc_state->phase > 0.5) { osc_state->phase -= 1.0; }
@@ -265,12 +206,14 @@ static void generate_audio(struct instance* instance, int start_frame, int end_f
   double svf_q = 1.0 - instance->wrapper_cc[CC_RESONANCE] / 127.0;
   double svf_grit = (1 + instance->wrapper_cc[CC_GRIT]) * (2.0/127.0);
   double volume = instance->wrapper_cc[CC_VOLUME] * instance->wrapper_cc[CC_VOLUME] / (127.0 * 127.0) * 0.25;
-  double portamento_speed = 1000 * pow(instance->wrapper_cc[CC_PORTAMENTO] / 127.0, 3);
-  double envelope_speed = 1000 * pow(instance->wrapper_cc[CC_ENVELOPE] / 127.0, 3);
+  double detune = instance->wrapper_cc[CC_DETUNE] * 0.0078125 / 128.0;
+  double osc1_freq = osc_freq * (1 - detune);
+  double osc2_freq = osc_freq * (1 + detune);
   for (int i = start_frame; i < end_frame; ++i) {
-    osc_freq += (osc_target_freq - osc_freq) * portamento_speed * dt;
-    double osc = tick_osc(&osc_state, osc_freq);
-    double env = env_state += (gain - env_state) * 2 * 3.141592 * envelope_speed * dt;
+    double osc1 = tick_osc(&osc1_state, osc1_freq);
+    double osc2 = tick_osc(&osc2_state, osc2_freq);
+    double osc = detune == 0 ? osc1 : (osc1 + osc2) * 0.707;
+    double env = env_state += (gain - env_state) * 2 * 3.141592 * env_freq * dt;
     double svf = svf_tick_nonlinear(&svf_state, osc, svf_freq * (1+10*env), svf_q, svf_grit);
     audio_out_buf[i] = svf * env * volume;
   }
@@ -302,8 +245,7 @@ void plugin_init(struct instance* instance, double sample_rate) {
   wrapper_add_cc(instance, CC_RESONANCE, "Resonance", "resonance", 64);
   wrapper_add_cc(instance, CC_GRIT, "Grit", "grit", 0);
   wrapper_add_cc(instance, CC_TRACKING, "Tracking", "tracking", 64);
-  wrapper_add_cc(instance, CC_PORTAMENTO, "Portamento", "portamento", 64);
-  wrapper_add_cc(instance, CC_ENVELOPE, "Envelope", "envelope", 64);
+  wrapper_add_cc(instance, CC_DETUNE, "Detune", "detune", 64);
 }
 
 void plugin_destroy(struct instance* instance) {

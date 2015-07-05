@@ -1,6 +1,6 @@
 # Flags
 
-CFLAGS := -Wall -O3 -std=c99 -ffast-math -ftree-vectorize -funroll-loops -Xlinker -no-undefined -std=gnu99
+CFLAGS := -Wall -O3 -std=c99 -ffast-math -ftree-vectorize -funroll-loops -Xlinker -no-undefined -std=gnu99 -fvisibility=hidden
 
 JACK_GTK_FLAGS := ${CFLAGS} -lm $(shell pkg-config --libs --cflags gtk+-2.0 json-c jack)
 
@@ -17,24 +17,31 @@ LADSPA_TARGETS := \
 	hpf-ladspa.so \
 	lpf-ladspa.so \
 	parametric-ladspa.so \
+	parametric2-ladspa.so \
 	tanh-distortion-ladspa.so \
+	exp-distortion-ladspa.so \
 	mono-panner-ladspa.so \
 	ms-reverb-ladspa.so \
 	ms-reverb2-ladspa.so \
 	ms-reverb3-ladspa.so \
-	ms-gain-ladspa.so
+	ms-gain-ladspa.so \
+	compressor-ladspa.so \
+	distbox-ladspa.so
 
 JACK_GTK_TARGETS := \
 	haas4-jack-gtk \
 	reverb-jack-gtk \
 	sawsynth-jack-gtk \
 	sawsynth2-jack-gtk \
+	sawsynth3-jack-gtk \
 	polysaw-jack-gtk \
 	apchain-jack-gtk \
 	synth2-jack-gtk \
+	monosynth-jack-gtk \
 	ms-reverb-jack-gtk \
 	ms-reverb2-jack-gtk \
-	ms-reverb3-jack-gtk
+	ms-reverb3-jack-gtk \
+	compressor-jack-gtk
 
 TARGETS := ${LADSPA_TARGETS} ${JACK_GTK_TARGETS} ladder-filter-designer
 

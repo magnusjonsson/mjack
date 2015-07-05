@@ -93,12 +93,18 @@ static void run(LADSPA_Handle Instance,
 {
   struct instance *instance = Instance;
   struct wrapper *w = instance->wrapper;
+  CHECK(w->num_ports <= MAX_PORTS, "w->num_ports overflow");
   FOR(i, w->num_ports) {
     if (port_cc_number[i] >= 0) {
+      if (!w->port_cc_value[i]) {
+	//fprintf(stderr, "Port cc %i not connected\n", i);
+	return;
+      }
       instance->wrapper_cc[port_cc_number[i]] = *w->port_cc_value[i];
     } else {
       if (!*w->port_buf[i]) {
-	fprintf(stderr, "Port buf %i not connected\n", i);
+	//fprintf(stderr, "Port buf %i not connected\n", i);
+	return;
       }
     }
   }
@@ -119,7 +125,7 @@ static LADSPA_Descriptor descriptor = {
   .Name = "Noname",
   .Properties = LADSPA_PROPERTY_REALTIME | LADSPA_PROPERTY_HARD_RT_CAPABLE,
   .Maker = "Magnus Jonsson",
-  .Copyright = "2013 Magnus Jonsson",
+  .Copyright = "2015 Magnus Jonsson",
   .PortCount = 0,
   .PortDescriptors = port_descriptors,
   .PortNames = port_names,

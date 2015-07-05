@@ -25,6 +25,8 @@ const char* plugin_persistence_name = "mjack_synth2";
 
 #define FOR(var,limit) for(int var = 0; var < limit; ++var)
 
+// TODO migrate all state into instance->plugin
+
 static void* midi_in_buf;
 static float* audio_out_buf;
 static char key_is_pressed[128];
@@ -32,6 +34,7 @@ static int current_key[NUM_VOICES] = { -1 };
 
 // constants
 static double dt;
+static double recip_sqrt_dt;
 
 // settings
 
@@ -61,6 +64,9 @@ static double dt;
   X(CC_VOLUME, 100, "Volume") \
   X(CC_OCTAVE, 101, "Octave") \
   X(CC_FIFTH, 102, "Fifth") \
+  X(CC_LIN_DRIFT, 103, "Lin Drift") \
+  X(CC_LOG_DRIFT, 104, "Log Drift") \
+  X(CC_DRIFT_CUTOFF, 105, "Drift Cufoff") \
 
 enum {
 #define X(name,value,_) name = value,
@@ -81,6 +87,7 @@ static struct simple_env env2[NUM_VOICES];
 
 static void init(double sample_rate) {
   dt = 1.0 / sample_rate;
+  recip_sqrt_dt = 1.0 / sqrt(dt);
   printf("dt = %lg\n", dt);
 }
 static void handle_midi_note_off(int key, int velocity) {
@@ -135,6 +142,10 @@ static void handle_midi_event(struct instance* instance, const jack_midi_event_t
   }
 }
 
+static double frand(void) {
+  return -1.0 + rand() * 2.0 / RAND_MAX;
+}
+
 static void generate_audio(struct instance* instance, int start_frame, int end_frame) {
   for(int i = start_frame; i < end_frame; ++i) {
     audio_out_buf[i] = 0.0;
@@ -164,7 +175,8 @@ static void generate_audio(struct instance* instance, int start_frame, int end_f
 
   double octave_cents = 1200.0 + 0.1 * (instance->wrapper_cc[CC_OCTAVE] - 64);
   double fifth_cents = 700.0 + 0.1 * (instance->wrapper_cc[CC_FIFTH] - 64);
-    
+   
+  double drift_coeff = dt * 2 * 3.141592 * 440.0 * pow((instance->wrapper_cc[CC_DRIFT_CUTOFF] + 1.0) / 128.0, 2.0);
 
   FOR(v, NUM_VOICES) {
     double pitch = meantone_cents(current_key[v], octave_cents, fifth_cents) * 0.01;
@@ -174,7 +186,16 @@ static void generate_audio(struct instance* instance, int start_frame, int end_f
       double env2_out = simple_env_tick(&env2[v], dt, env2_speed, env2_decay);
 
       double osc_final_pw = osc_pulse_width + osc_pwm_depth * lfo_tick(&osc_pwm_lfo[v], dt, 0, osc_pwm_freq);
-      double osc_final_freq = 440.0 * pow(2, (pitch + osc_vibrato_depth * lfo_tick(&osc_vibrato_lfo[v], dt, osc_vibrato_delay, osc_vibrato_freq)) / 12.0);
+      double vibrato_lfo_out = lfo_tick(&osc_vibrato_lfo[v], dt, osc_vibrato_delay, osc_vibrato_freq);
+      double lin_drift_noise = instance->wrapper_cc[CC_LIN_DRIFT] / 127.0 * frand();
+      double log_drift_noise = instance->wrapper_cc[CC_LOG_DRIFT] / 127.0 * frand() * 0.01;
+
+      static double lin_drift_lpf[NUM_VOICES];
+      static double log_drift_lpf[NUM_VOICES];
+
+      lin_drift_lpf[v] += (lin_drift_noise * recip_sqrt_dt - lin_drift_lpf[v]) * drift_coeff;
+      log_drift_lpf[v] += (log_drift_noise * recip_sqrt_dt - log_drift_lpf[v]) * drift_coeff;
+      double osc_final_freq = 440.0 * pow(2, (pitch + osc_vibrato_depth * vibrato_lfo_out) / 12.0) * (1 + log_drift_lpf[v]) + lin_drift_lpf[v];
 
       double saw_out = osc_tick(&osc[v], dt, osc_final_freq);
       double pulse_out = saw_out > osc_final_pw ? 0.6 : -0.6;

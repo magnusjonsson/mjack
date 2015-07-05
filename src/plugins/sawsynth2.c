@@ -6,8 +6,8 @@
 
 #include "../wrappers/wrapper.h"
 
-const char* plugin_name = "SawSynth";
-const char* plugin_persistence_name = "mjack_sawsynth";
+const char* plugin_name = "SawSynth2";
+const char* plugin_persistence_name = "mjack_sawsynth2";
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846

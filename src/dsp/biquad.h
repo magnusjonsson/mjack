@@ -44,6 +44,13 @@ static inline struct biquad_coeffs biquad_digital_parametric(struct biquad_param
   return biquad_bilinear_transform(biquad_analog_parametric(biquad_prewarp(p)));
 }
 
+static inline struct biquad_coeffs biquad_invert(struct biquad_coeffs _) {
+  return (struct biquad_coeffs) {
+    .b2 = _.a2, .b1 = _.a1, .b0 = _.a0,
+    .a2 = _.b2, .a1 = _.b1, .a0 = _.b0,
+  };
+}
+
 struct biquad_state {
   double x1, x2;
   double y1, y2;

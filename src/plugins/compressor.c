@@ -44,12 +44,13 @@ void plugin_process(struct instance* instance, int nframes) {
     double instantaneous_power = x * x;
     double k = instantaneous_power > c->power ? k_attack : k_release;
     c->power += k * (instantaneous_power - c->power);
-    float gain = t / sqrtf(t*t + c->power);
+    float gain = t / sqrtf(t*t + c->power + 1e-30f);
     c->out[i] = x * gain;
   }
 }
 
 void plugin_init(struct instance* instance, double sample_rate) {
+  printf("Compressor init\n");
   struct compressor *c = calloc(1, sizeof(struct compressor));
   instance->plugin = c;
   c->dt = 1 / sample_rate;

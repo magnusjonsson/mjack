@@ -156,13 +156,6 @@ static int next_voice;
 static void handle_midi_note_on(struct instance* instance, int key, int velocity) {
   if (!key_is_pressed[key]) {
     key_is_pressed[key] = 1;
-    FOR(v, NUM_VOICES) {
-      if (gain[v] > 0 && (current_key[v] == key - 1 || current_key[v] == key + 1)) {
-	osc_freq[v] = 440.0 * pow(2.0, (key_cents(instance, key) + key_cents(instance, current_key[v])) * 0.5 / 1200.0);
-	current_key[v] = key;
-	return;
-      }
-    }
     FOR(count, NUM_VOICES) {
       int v = next_voice++;
       if (next_voice >= NUM_VOICES) next_voice = 0;

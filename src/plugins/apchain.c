@@ -97,6 +97,7 @@ void plugin_process(struct instance* instance, int nframes) {
 }
 
 void plugin_init(struct instance* instance, double sample_rate) {
+  printf("Apchain init\n");
   struct apchain *a = calloc(1, sizeof(struct apchain));
   instance->plugin = a;
   init(a, sample_rate);

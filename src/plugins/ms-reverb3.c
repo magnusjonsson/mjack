@@ -16,7 +16,8 @@ const unsigned plugin_ladspa_unique_id = 13;
 #define NUM_STAGES 8
 
 #define CC_SHAPE 80
-#define CC_ALLPASS_TIME_START 81
+#define CC_SIGN 81
+#define CC_ALLPASS_TIME_START 82
 
 #define MAX_STAGE_TIME_SECONDS 0.1
 
@@ -89,6 +90,7 @@ void plugin_process(struct instance* instance, int nframes) {
     //printf("%i\n", (int) (r->memory_pool_end - r->memory_pool_start));
     printf("error: alloc_ptr >= r->memory_pool_end");
   }
+  float sign = instance->wrapper_cc[CC_SHAPE] >= 64 ? -1 : 1;
   float kshape = (0.5f + instance->wrapper_cc[CC_SHAPE]) / 128.0f;
   FOR(o, NUM_OUTS) {
     float *out = r->outbufs[o];
@@ -107,7 +109,7 @@ void plugin_process(struct instance* instance, int nframes) {
       //float k = kshape;
 
       // constant tail bandwidth
-      float k = fmax(0.0f, 1.0f - kshape * kshape / allpasstime[o][i]);
+      float k = sign * fmax(0.0f, 1.0f - kshape * kshape / allpasstime[o][i]);
 
       // same power from all tails
       // tail coloration: weak
@@ -159,6 +161,7 @@ void plugin_init(struct instance* instance, double sample_rate) {
   FOR(i, NUM_OUTS) wrapper_add_audio_output(instance, outname[i], &r->outbufs[i]);
   printf("CCs\n");
   wrapper_add_cc(instance, CC_SHAPE, "K", "k", 64);
+   wrapper_add_cc(instance, CC_SIGN, "Sign", "sign", 0);
   static const char *outputname[NUM_OUTS] = { "mid", "side" };
   static char allpasstimename[NUM_OUTS][NUM_STAGES][MAX_NAME_LENGTH];
   FOR(o, NUM_OUTS) FOR(s, NUM_STAGES) snprintf(allpasstimename[o][s], MAX_NAME_LENGTH, "%s time %i", outputname[o], s);
