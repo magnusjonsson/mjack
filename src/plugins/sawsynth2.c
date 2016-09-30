@@ -15,8 +15,8 @@ const char* plugin_persistence_name = "mjack_sawsynth2";
 
 #define FOR(var,limit) for(int var = 0; var < limit; ++var)
 
-static void* midi_in_buf;
-static float* audio_out_buf;
+static void *midi_in_buf;
+static float *audio_out_buf;
 static char key_is_pressed[128];
 static int key_count_pressed;
 static int current_key = -1;
@@ -26,17 +26,39 @@ static double dt;
 
 // settings
 
-#define CC_VOLUME 7
-#define CC_CUTOFF 77
-#define CC_RESONANCE 71
-#define CC_TRACKING 80
-#define CC_VCF_DECAY 126 // TODO assign
+#define KNOBS \
+  X(CC_VOLUME, 7, "Volume")			\
+  X(CC_CUTOFF, 77, "Cutoff") \
+  X(CC_RESONANCE, 71, "Resonance") \
+  X(CC_TRACKING, 80, "Tracking") \
+  X(CC_VCF_DECAY, 126, "VCF Decay") \
+  X(CC_CLICK, 125, "Click") \
+
+enum {
+#define X(name,value,_) name = value,
+  KNOBS
+#undef X
+};
+
+
+void plugin_init(struct instance* instance, double sample_rate) {
+  dt = 1.0 / sample_rate;
+  wrapper_add_midi_input(instance, "midi in", &midi_in_buf);
+  wrapper_add_audio_output(instance, "audio out", &audio_out_buf);
+#define X(name, value, label) wrapper_add_cc(instance, value, label, #name, 64);
+  KNOBS
+#undef X
+}
+
+void plugin_destroy(struct instance* instance) {
+}
+
+
 
 // dsp control values
 static double gain;
 static double vcf_env;
 static double osc_freq;
-static double env_freq;
 
 struct lpf {
   double re;
@@ -72,12 +94,10 @@ struct osc_state {
 };
 
 static struct osc_state osc_state;
-static double env_state;
+static double smoothed_osc_freq;
+static double smoothed_amp;
+static double smoothed_vcf_env;
 
-static void init(double sample_rate) {
-  dt = 1.0 / sample_rate;
-  printf("dt = %lg\n", dt);
-}
 static void handle_midi_note_off(int key, int velocity) {
   if (key_is_pressed[key]) {
     key_is_pressed[key] = 0;
@@ -88,19 +108,18 @@ static void handle_midi_note_off(int key, int velocity) {
   }
 }
 
-static void handle_midi_note_on(int key, int velocity) {
+static void handle_midi_note_on(struct instance *instance, int key, int velocity) {
   if (!key_is_pressed[key]) {
     key_is_pressed[key] = 1;
     ++key_count_pressed;
     current_key = key;
-    osc_freq = 440.0 * pow(2.0, (key - 69) / 12.0);
-    env_freq = osc_freq * 0.25;
+    osc_freq = instance->freq[key];
     gain = velocity / 127.0;
-    vcf_env = 1.0;
+    vcf_env = velocity / 127.0;
   }
 }
 
-static void handle_midi_event(const jack_midi_event_t* event) {
+static void handle_midi_event(struct instance *instance, const jack_midi_event_t* event) {
   switch (event->buffer[0] & 0xf0) {
   case 0x80:
     handle_midi_note_off(event->buffer[1], event->buffer[2]);
@@ -109,7 +128,7 @@ static void handle_midi_event(const jack_midi_event_t* event) {
     if (event->buffer[2] == 0) {
       handle_midi_note_off(event->buffer[1], 64);
     } else {
-      handle_midi_note_on(event->buffer[1], event->buffer[2]);
+      handle_midi_note_on(instance, event->buffer[1], event->buffer[2]);
     }
     break;
   }
@@ -153,17 +172,24 @@ static double tick_osc_saw(struct osc_state* osc_state, double freq, double re, 
 }
 
 static void generate_audio(struct instance* instance, int start_frame, int end_frame) {
-  double cutoff = 440.0 * pow(2.0, (current_key - 69) / 12.0 * (instance->wrapper_cc[CC_TRACKING] / 127.0) + (instance->wrapper_cc[CC_CUTOFF] - 69 + 24 + 4) / 12.0) * 3.141592;
+  double cutoff = 440.0 * pow(2.0, (current_key - 69) / 12.0 * (instance->wrapper_cc[CC_TRACKING] / 127.0) + (instance->wrapper_cc[CC_CUTOFF] - 69 + 24 + 4) / 12.0) * M_PI;
   double reso = instance->wrapper_cc[CC_RESONANCE] / 128.0;
   double re = -cutoff * (1 - reso);
   double im = cutoff * reso;
   double volume = instance->wrapper_cc[CC_VOLUME] * instance->wrapper_cc[CC_VOLUME] / (127.0 * 127.0) * 0.25;
   double vcf_decay_rate = 10000 * pow(instance->wrapper_cc[CC_VCF_DECAY] / 127.0, 2);
+  double smoothing_freq = 1000 * pow((1 + instance->wrapper_cc[CC_CLICK]) / 127.0, 2);
   for (int i = start_frame; i < end_frame; ++i) {
-    double env = env_state += (gain - env_state) * 2 * 3.141592 * env_freq * dt;
+
     vcf_env *= fmax(0.5, 1 - vcf_env * vcf_env * vcf_env * vcf_decay_rate * dt);
-    double svf = tick_osc_saw(&osc_state, osc_freq, re * vcf_env, im * vcf_env);
-    audio_out_buf[i] = svf * env * volume;
+    smoothed_vcf_env += (vcf_env - smoothed_vcf_env) * 2 * M_PI * smoothing_freq * dt;
+
+    smoothed_osc_freq += (osc_freq - smoothed_osc_freq) * 2 * M_PI * smoothing_freq * dt;
+    
+    double vcf_out = tick_osc_saw(&osc_state, smoothed_osc_freq, re * vcf_env, im * vcf_env);
+
+    smoothed_amp += (volume * gain - smoothed_amp) * 2 * M_PI * smoothing_freq * dt;
+    audio_out_buf[i] = vcf_out * smoothed_amp;
   }
 }
 
@@ -173,7 +199,7 @@ void plugin_process(struct instance* instance, int nframes) {
   FOR(e, num_events) {
     jack_midi_event_t event;
     jack_midi_event_get(&event, midi_in_buf, e);
-    handle_midi_event(&event);
+    handle_midi_event(instance, &event);
     if (sample_index < event.time) {
       generate_audio(instance, sample_index, event.time);
       sample_index = event.time;
@@ -182,18 +208,4 @@ void plugin_process(struct instance* instance, int nframes) {
   if (sample_index < nframes) {
     generate_audio(instance, sample_index, nframes);
   }
-}
-
-void plugin_init(struct instance* instance, double sample_rate) {
-  init(sample_rate);
-  wrapper_add_midi_input(instance, "midi in", &midi_in_buf);
-  wrapper_add_audio_output(instance, "audio out", &audio_out_buf);
-  wrapper_add_cc(instance, CC_VOLUME, "Volume", "volume", 64);
-  wrapper_add_cc(instance, CC_CUTOFF, "Cutoff", "cutoff", 64);
-  wrapper_add_cc(instance, CC_RESONANCE, "Resonance", "resonance", 64);
-  wrapper_add_cc(instance, CC_VCF_DECAY, "VCF Decay", "vcf_decay", 64);
-  wrapper_add_cc(instance, CC_TRACKING, "Tracking", "tracking", 64);
-}
-
-void plugin_destroy(struct instance* instance) {
 }

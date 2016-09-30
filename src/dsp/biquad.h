@@ -33,6 +33,13 @@ inline struct biquad_coeffs biquad_analog_parametric(struct biquad_params _) {
   };
 }
 
+inline struct biquad_coeffs biquad_analog_parametric_asymmetric(struct biquad_params _) {
+  return (struct biquad_coeffs) {
+    .b2 = _.g2, .b1 = _.w / _.Q * _.g1, .b0 = _.w * _.w * _.g0,
+    .a2 = 1.0,  .a1 = _.w / _.Q       , .a0 = _.w * _.w,
+  };
+}
+
 static inline struct biquad_coeffs biquad_bilinear_transform(struct biquad_coeffs _) {
   return (struct biquad_coeffs) {
     .b2 = _.b2 - _.b1 + _.b0, .b1 = 2.0 * (_.b0 - _.b2), .b0 = _.b2 + _.b1 + _.b0,
@@ -42,6 +49,10 @@ static inline struct biquad_coeffs biquad_bilinear_transform(struct biquad_coeff
 
 static inline struct biquad_coeffs biquad_digital_parametric(struct biquad_params p) {
   return biquad_bilinear_transform(biquad_analog_parametric(biquad_prewarp(p)));
+}
+
+static inline struct biquad_coeffs biquad_digital_parametric_asymmetric(struct biquad_params p) {
+  return biquad_bilinear_transform(biquad_analog_parametric_asymmetric(biquad_prewarp(p)));
 }
 
 static inline struct biquad_coeffs biquad_invert(struct biquad_coeffs _) {
@@ -70,4 +81,9 @@ static inline void biquad_process(struct biquad_coeffs c, struct biquad_state *s
     s->x2 = s->x1; s->x1 = x0;
     s->y2 = s->y1; s->y1 = y0;
   }
+}
+static inline float biquad_tick(struct biquad_coeffs c, struct biquad_state *state, float in) {
+  float out;
+  biquad_process(c, state, &in, &out, 1);
+  return out;
 }

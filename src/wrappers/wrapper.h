@@ -3,6 +3,8 @@
 
 struct instance {
   char wrapper_cc[128];
+  float freq[128];
+  float cents[128];
   void *plugin;
   void *wrapper;
 };

@@ -32,6 +32,9 @@ static double dt;
 #define CC_GRIT 75
 #define CC_PORTAMENTO 81
 #define CC_ENVELOPE 82
+#define CC_VIBRATO_DEPTH 83
+#define CC_VIBRATO_RATE 84
+#define CC_VIBRATO_ENVELOPE 85
 
 // dsp control values
 static double gain;
@@ -154,7 +157,8 @@ static void init(double sample_rate) {
   dt = 1.0 / sample_rate;
   printf("dt = %lg\n", dt);
 }
-static void handle_midi_note_off(int key, int velocity) {
+
+static void handle_midi_note_off(struct instance *instance, int key, int velocity) {
   if (key_is_pressed[key]) {
     key_is_pressed[key] = 0;
     --key_count_pressed;
@@ -164,26 +168,26 @@ static void handle_midi_note_off(int key, int velocity) {
   }
 }
 
-static void handle_midi_note_on(int key, int velocity) {
+static void handle_midi_note_on(struct instance *instance, int key, int velocity) {
   if (!key_is_pressed[key]) {
     key_is_pressed[key] = 1;
     ++key_count_pressed;
     current_key = key;
-    osc_target_freq = 440.0 * pow(2.0, (key - 69) / 12.0);
+    osc_target_freq = instance->freq[key];
     gain = velocity / 127.0;
   }
 }
 
-static void handle_midi_event(const jack_midi_event_t* event) {
+static void handle_midi_event(struct instance *instance, const jack_midi_event_t* event) {
   switch (event->buffer[0] & 0xf0) {
   case 0x80:
-    handle_midi_note_off(event->buffer[1], event->buffer[2]);
+    handle_midi_note_off(instance, event->buffer[1], event->buffer[2]);
     break;
   case 0x90:
     if (event->buffer[2] == 0) {
-      handle_midi_note_off(event->buffer[1], 64);
+      handle_midi_note_off(instance, event->buffer[1], 64);
     } else {
-      handle_midi_note_on(event->buffer[1], event->buffer[2]);
+      handle_midi_note_on(instance, event->buffer[1], event->buffer[2]);
     }
     break;
   }
@@ -261,15 +265,23 @@ static double tick_osc(struct osc_state* osc_state, double freq) {
 }
 
 static void generate_audio(struct instance* instance, int start_frame, int end_frame) {
-  double svf_freq = 440.0 * pow(2.0, (current_key - 69 - 12) / 12.0 * (instance->wrapper_cc[CC_TRACKING] / 127.0) + (instance->wrapper_cc[CC_CUTOFF] - 69 + 12) / 12.0);
+  double svf_freq = 440.0 * pow(2.0, instance->cents[current_key] / 1200.0 * (instance->wrapper_cc[CC_TRACKING] / 127.0) + (instance->wrapper_cc[CC_CUTOFF] - 69 + 12) / 12.0);
   double svf_q = 1.0 - instance->wrapper_cc[CC_RESONANCE] / 127.0;
   double svf_grit = (1 + instance->wrapper_cc[CC_GRIT]) * (2.0/127.0);
   double volume = instance->wrapper_cc[CC_VOLUME] * instance->wrapper_cc[CC_VOLUME] / (127.0 * 127.0) * 0.25;
   double portamento_speed = 1000 * pow(instance->wrapper_cc[CC_PORTAMENTO] / 127.0, 3);
   double envelope_speed = 1000 * pow(instance->wrapper_cc[CC_ENVELOPE] / 127.0, 3);
+  double vibrato_depth = 0.015 * pow(instance->wrapper_cc[CC_VIBRATO_DEPTH] / 127.0, 2);
+  double vibrato_rate = 15 * pow(instance->wrapper_cc[CC_VIBRATO_RATE] / 127.0, 2);
+  double vibrato_env_speed = 10 * pow(instance->wrapper_cc[CC_VIBRATO_ENVELOPE] / 127.0, 3);
   for (int i = start_frame; i < end_frame; ++i) {
+    static double vibrato_phase;
+    vibrato_phase += vibrato_rate * dt;
+    if (vibrato_phase > 0.5) { vibrato_phase -= 1.0; }
     osc_freq += (osc_target_freq - osc_freq) * portamento_speed * dt;
-    double osc = tick_osc(&osc_state, osc_freq);
+    static double vibrato_env_state;
+    vibrato_env_state += (gain * vibrato_depth - vibrato_env_state) * 2 * 3.141592 * vibrato_env_speed * dt;
+    double osc = tick_osc(&osc_state, osc_freq * (1 + vibrato_env_state * sin(vibrato_phase * 2 * 3.141592)));
     double env = env_state += (gain - env_state) * 2 * 3.141592 * envelope_speed * dt;
     double svf = svf_tick_nonlinear(&svf_state, osc, svf_freq * (1+10*env), svf_q, svf_grit);
     audio_out_buf[i] = svf * env * volume;
@@ -282,7 +294,7 @@ void plugin_process(struct instance* instance, int nframes) {
   FOR(e, num_events) {
     jack_midi_event_t event;
     jack_midi_event_get(&event, midi_in_buf, e);
-    handle_midi_event(&event);
+    handle_midi_event(instance, &event);
     if (sample_index < event.time) {
       generate_audio(instance, sample_index, event.time);
       sample_index = event.time;
@@ -304,6 +316,9 @@ void plugin_init(struct instance* instance, double sample_rate) {
   wrapper_add_cc(instance, CC_TRACKING, "Tracking", "tracking", 64);
   wrapper_add_cc(instance, CC_PORTAMENTO, "Portamento", "portamento", 64);
   wrapper_add_cc(instance, CC_ENVELOPE, "Envelope", "envelope", 64);
+  wrapper_add_cc(instance, CC_VIBRATO_RATE, "Vibrato Rate", "vibrato_rate", 64);
+  wrapper_add_cc(instance, CC_VIBRATO_DEPTH, "Vibrato Depth", "vibrato_depth", 64);
+  wrapper_add_cc(instance, CC_VIBRATO_ENVELOPE, "Vibrato Envelope", "vibrato_envelope", 64);
 }
 
 void plugin_destroy(struct instance* instance) {

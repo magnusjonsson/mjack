@@ -6,6 +6,9 @@
 #include <jack/session.h>
 #include <gtk/gtk.h>
 #include <json.h>
+#include <math.h>
+#include <stdbool.h>
+#include <errno.h>
 
 typedef jack_port_t port_t;
 typedef jack_port_t port_t;
@@ -136,7 +139,101 @@ static int process_cb(jack_nframes_t nframes, void* arg) {
   return 0;
 }
 
-static void randomize() {
+static char *read_scala_line(char *buf, size_t len, FILE *fp) {
+  while (true) {
+    if (!fgets(buf, len, fp)) {
+      return NULL;
+    }
+    if (buf[0] != '!') {
+      return buf;
+    }
+  }
+}
+
+static void load_scala_file(const char *filename) {
+  FILE *fp = fopen(filename, "rt");
+  if (!fp) {
+    fprintf(stdout, "Could not open scala file %s\n", filename);
+    goto err;
+  }
+  char buf[1024];
+  char *comment = read_scala_line(buf, sizeof buf, fp);
+  if (!comment) {
+    fprintf(stdout, "Missing comment line in %s\n", filename);
+    goto err;
+  }
+  char *count = read_scala_line(buf, sizeof buf, fp);
+  if (!count) {
+    fprintf(stdout, "Missing number of scale degrees in %s\n", filename);
+    goto err;
+  }
+  int n = atoi(count);
+  if (n <= 0) {
+    fprintf(stdout, "Too few scale degrees in %s: %i\n", filename, n);
+    goto err;
+  }
+  if (n >= 128) {
+    fprintf(stdout, "Too many scale degrees in %s: %i\n", filename, n); 
+    goto err;
+  }
+  float cents[128];
+  FOR(i, n) {
+    char *ratio_str = read_scala_line(buf, sizeof buf, fp);
+    if (!ratio_str) {
+      fprintf(stdout, "Could not read scale degree %i in %s\n", i + 1, filename); 
+      goto err;
+    }
+    char *slash = strchr(ratio_str, '/');
+    if (slash) {
+      *slash = '\0';
+      int numer = atoi(ratio_str);
+      int denom = atoi(slash + 1);
+      if (numer <= 0 || denom <= 0) {
+	fprintf(stdout, "Could not parse ratio in %s\n", filename); 
+	goto err;
+      }
+      cents[i] = log((float) numer / (float) denom) / log(2.0) * 1200.0;
+    } else {
+      char *end = NULL;
+      cents[i] = strtof(ratio_str, &end);
+      if (end == ratio_str) {
+	fprintf(stdout, "Could not parse cents value in %s\n", filename); 
+	goto err;
+      }
+    }
+  }
+  FOR(i, 128) {
+    int note = (i - 72) % n;
+    int oct = (i - 72) / n;
+    if (note < 0) {
+      note += n;
+      oct -= 1;
+    }
+    instance.cents[i] = 300.0 + cents[n-1] * oct + (note == 0 ? 1.0 : cents[note-1]);
+    instance.freq[i] = 440.0 * pow(2.0, instance.cents[i] / 1200.0);
+  }
+ err:
+  fclose(fp);
+}
+
+static void load_scale(void) {
+  GtkWidget *dialog =
+    gtk_file_chooser_dialog_new("Open Scala Scale File",
+				GTK_WINDOW(window),
+				GTK_FILE_CHOOSER_ACTION_OPEN,
+				GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
+				GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
+				NULL);
+  if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+    char *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
+    load_scala_file(filename);
+    g_free(filename);
+  }
+
+gtk_widget_destroy (dialog);
+}
+
+static void randomize(void) {
   FOR(i, 128) {
     if (cc_adjustment[i]) {
       int v = rand()%128;
@@ -146,7 +243,7 @@ static void randomize() {
   }
 }
 
-void wrapper_init(int* argc, char*** argv, const char* title, const char* name) {
+static void wrapper_init(int* argc, char*** argv, const char* title, const char* name) {
   gtk_init(argc, argv);
   program_name = (*argv)[0];
   while (1) {
@@ -177,6 +274,11 @@ void wrapper_init(int* argc, char*** argv, const char* title, const char* name) 
     exit(1);
   }
 
+  FOR(i, 128) {
+    instance.cents[i] = (i - 67.0) * 100.0;
+    instance.freq[i] = 440 * pow(2.0, instance.cents[i] / 1200.0);
+  }
+
   window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
   g_signal_connect_swapped(G_OBJECT(window), "destroy",
                            G_CALLBACK(gtk_main_quit), NULL);
@@ -184,11 +286,16 @@ void wrapper_init(int* argc, char*** argv, const char* title, const char* name) 
   gtk_window_set_default_size(GTK_WINDOW(window), 300, 200);
   sliders_box = gtk_vbox_new(FALSE, 0);
   gtk_container_add(GTK_CONTAINER(window), sliders_box);
-  GtkWidget *button = gtk_button_new_with_label("Randomize");
-  gtk_signal_connect(GTK_OBJECT(button), "clicked",
+  GtkWidget *load_scale_button = gtk_button_new_with_label("Load Scale");
+  gtk_signal_connect(GTK_OBJECT(load_scale_button), "clicked",
+		     GTK_SIGNAL_FUNC(load_scale), (gpointer) NULL);
+  gtk_container_add(GTK_CONTAINER(sliders_box), load_scale_button);
+  gtk_widget_show(load_scale_button);
+  GtkWidget *randomize_button = gtk_button_new_with_label("Randomize");
+  gtk_signal_connect(GTK_OBJECT(randomize_button), "clicked",
 		     GTK_SIGNAL_FUNC(randomize), (gpointer) NULL);
-  gtk_container_add(GTK_CONTAINER(sliders_box), button);
-  gtk_widget_show(button);
+  gtk_container_add(GTK_CONTAINER(sliders_box), randomize_button);
+  gtk_widget_show(randomize_button);
 
   jack_client = jack_client_open(name, JackSessionID, &jack_status, option_uuid);
   CHECK(jack_client, "jack_client_open");
@@ -198,7 +305,7 @@ void wrapper_init(int* argc, char*** argv, const char* title, const char* name) 
   CHECK(!jack_set_process_callback(jack_client, process_cb, NULL), "jack_set_process_callback")
 }
 
-void wrapper_run() {
+static void wrapper_run() {
   gtk_widget_show(sliders_box);
   gtk_widget_show(window);
   if (option_dir) {

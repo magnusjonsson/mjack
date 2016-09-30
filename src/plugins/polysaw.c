@@ -47,8 +47,6 @@ static double dt;
 #define CC_VCF2_TRACKING 88
 
 #define CC_VCF_PRE_GAIN 89
-#define CC_OCTAVE 90
-#define CC_FIFTH 91
 
 #define CC_VCA_ATTACK 92
 #define CC_VCA_DECAY 93
@@ -105,52 +103,6 @@ static void handle_midi_note_off(int key, int velocity) {
     }
   }
 }
-
-const struct {
-  int octaves;
-  int fifths;
-} note_vector[12] = {
-  {0,0},  // C
-  {-4,7}, // C#
-  {-1,2}, // D
-  {2,-3}, // Eb
-  {-2,4}, // E
-  {1,-1}, // F
-  {-3,6}, // F#
-  {0,1},  // G
-  {-4,8}, // G#
-  {-1,3}, // A
-  {2,-2}, // Bb
-  {-2,5}, // B
-};
-
-const double ji_ratio[12] = {
-  1.0,
-  17.0/16.0,
-  9.0/8.0,
-  19.0/16.0,
-  5.0/4.0,
-  21.0/16.0,
-  11.0/8.0,
-  3.0/2.0,
-  13.0/8.0,
-  27.0/16.0,
-  7.0/4.0,
-  15.0/8.0,
-};
-
-static double key_cents(struct instance *instance, int key) {
-  int note = key%12;
-  int oct = key/12 - 5;
-  if (instance->wrapper_cc[CC_OCTAVE] == 0 && instance->wrapper_cc[CC_FIFTH] == 0) {
-    return 1200.0 * oct + 1200.0 * log(ji_ratio[note]) / log(2);
-  } else {
-    double OCTAVE_CENTS = 1200.0 + 0.1 * (instance->wrapper_cc[CC_OCTAVE]-64);
-    double FIFTH_CENTS = 700.0 + 0.1 * (instance->wrapper_cc[CC_FIFTH]-64);
-    return (OCTAVE_CENTS * (oct + note_vector[note].octaves - note_vector[9].octaves) + FIFTH_CENTS * (note_vector[note].fifths - note_vector[9].fifths));
-  }
-}
-
 static int next_voice;
 
 static void handle_midi_note_on(struct instance* instance, int key, int velocity) {
@@ -162,7 +114,7 @@ static void handle_midi_note_on(struct instance* instance, int key, int velocity
       if (gain[v] == 0.0) {
 	current_key[v] = key;
 
-	osc_freq[v] = 440.0 * pow(2.0, key_cents(instance, key) / 1200.0);
+	osc_freq[v] = instance->freq[key];
 	env_freq[v] = osc_freq[v] * 1.0;
 	adsr_env_trigger(&vca_env[v]);
 	adsr_env_trigger(&vcf1_env[v]);
@@ -291,8 +243,6 @@ void plugin_init(struct instance* instance, double sample_rate) {
   wrapper_add_cc(instance, CC_VCF2_DECAY, "VCF2 Decay", "vcf2_decay", 64);
   wrapper_add_cc(instance, CC_VCF2_SUSTAIN, "VCF2 Sustain", "vcf2_sustain", 64);
   wrapper_add_cc(instance, CC_VCF2_RELEASE, "VCF2 Release", "vcf2_release", 64);
-  wrapper_add_cc(instance, CC_OCTAVE, "Octave", "octave", 64);
-  wrapper_add_cc(instance, CC_FIFTH, "Fifth", "fifth", 64);
   wrapper_add_cc(instance, CC_DRIFT, "Drift", "drift", 64);
   wrapper_add_cc(instance, CC_LFO_DELAY, "Lfo Delay", "lfo_delay", 64);
   wrapper_add_cc(instance, CC_LFO_FREQ, "Lfo Freq", "lfo_freq", 64);

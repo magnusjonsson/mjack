@@ -80,7 +80,7 @@ static void generate_audio(struct instance* instance, int start_frame, int end_f
     }
     vel += acc * k;
     pos += vel * k;
-    audio_out_buf[i] = pos;
+    audio_out_buf[i] = pos * 4;
   }
 }
 
