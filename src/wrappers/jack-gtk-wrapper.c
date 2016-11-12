@@ -209,7 +209,7 @@ static void load_scala_file(const char *filename) {
       note += n;
       oct -= 1;
     }
-    instance.cents[i] = 300.0 + cents[n-1] * oct + (note == 0 ? 1.0 : cents[note-1]);
+    instance.cents[i] = 300 + cents[n-1] * oct + (note == 0 ? 1.0 : cents[note-1]);
     instance.freq[i] = 440.0 * pow(2.0, instance.cents[i] / 1200.0);
   }
  err:
@@ -275,7 +275,7 @@ static void wrapper_init(int* argc, char*** argv, const char* title, const char*
   }
 
   FOR(i, 128) {
-    instance.cents[i] = (i - 67.0) * 100.0;
+    instance.cents[i] = (i - 69.0) * 100.0;
     instance.freq[i] = 440 * pow(2.0, instance.cents[i] / 1200.0);
   }
 
