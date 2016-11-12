@@ -27,12 +27,16 @@ static double dt;
 // settings
 
 #define KNOBS \
-  X(CC_VOLUME, 7, "Volume")			\
+  X(CC_VOLUME, 7, "Volume") \
   X(CC_CUTOFF, 77, "Cutoff") \
   X(CC_RESONANCE, 71, "Resonance") \
-  X(CC_TRACKING, 80, "Tracking") \
-  X(CC_VCF_DECAY, 126, "VCF Decay") \
-  X(CC_CLICK, 125, "Click") \
+  X(CC_CUTOFF_KBD, 80, "Cutoff Kbd") \
+  X(CC_AMP_DECAY, 121, "AMP Decay") \
+  X(CC_VCF_DECAY, 122, "VCF Decay") \
+  X(CC_CLICK, 123, "Click") \
+  X(CC_LFO_RATE, 124, "LFO Rate") \
+  X(CC_PITCH_LFO, 125, "Pitch LFO") \
+  X(CC_CUTOFF_LFO, 126, "Cutoff LFO") \
 
 enum {
 #define X(name,value,_) name = value,
@@ -55,10 +59,12 @@ void plugin_destroy(struct instance* instance) {
 
 
 
-// dsp control values
-static double gain;
+// control state
+static double amp_env;
 static double vcf_env;
 static double osc_freq;
+static double lfo_phase;
+
 
 struct lpf {
   double re;
@@ -66,22 +72,38 @@ struct lpf {
 };
 
 void lpf_tick(struct lpf *lpf, double pole_re, double pole_im, double dt, double input_A) {
+  if (pole_im <= 0 || pole_re >= 0) {
+    return;
+  }
   double phi_re = exp(pole_re * dt) * cos(pole_im * dt);
   double phi_im = exp(pole_re * dt) * sin(pole_im * dt);
+
+  double re = lpf->re;
+  double im = lpf->im;
+
+  double input_re = input_A;
+  double input_im = input_A * pole_re / pole_im;
   
-  double new_re = lpf->re * phi_re - lpf->im * phi_im;
-  double new_im = lpf->re * phi_im + lpf->im * phi_re;
+  re -= input_re; // part 1 of integral
+  im -= input_im;
+  
+  double new_re = re * phi_re - im * phi_im;
+  double new_im = re * phi_im + im * phi_re;
 
-  lpf->re = new_re + (1 - phi_re) * input_A;
-  lpf->im = new_im - phi_im * input_A;
+  new_re += input_re; // part 2 of intergral
+  new_im += input_im;
+  
+  lpf->re = new_re;
+  lpf->im = new_im;
 }
-
-void lpf_add_step(struct lpf *lpf, double pole_re, double pole_im, double dt, double A) {
-  double phi_re = exp(pole_re * dt) * cos(pole_im * dt);
-  double phi_im = exp(pole_re * dt) * sin(pole_im * dt);
-  lpf->re += (1 - phi_re) * A;
-  lpf->im += -phi_im * A;
+/*
+  double input_re = input_A * pole_im / sqrt(pole_re * pole_re + pole_im * pole_im);
+  double input_im = input_A * pole_re / sqrt(pole_re * pole_re + pole_im * pole_im);
+  
+  lpf->re = new_re + input_re + (1 - phi_re) * input_re + phi_im * input_im;
+  lpf->im = new_im + input_im      - phi_im  * input_re + phi_re * input_im;
 }
+*/
 
 double lpf_sample(struct lpf *lpf) {
   return lpf->re;
@@ -103,7 +125,7 @@ static void handle_midi_note_off(int key, int velocity) {
     key_is_pressed[key] = 0;
     --key_count_pressed;
     if (key_count_pressed == 0) {
-      gain = 0.0;
+      amp_env = 0.0;
     }
   }
 }
@@ -114,7 +136,7 @@ static void handle_midi_note_on(struct instance *instance, int key, int velocity
     ++key_count_pressed;
     current_key = key;
     osc_freq = instance->freq[key];
-    gain = velocity / 127.0;
+    amp_env = velocity / 127.0;
     vcf_env = velocity / 127.0;
   }
 }
@@ -135,61 +157,80 @@ static void handle_midi_event(struct instance *instance, const jack_midi_event_t
 }
 
 static inline double tick_osc_square(struct osc_state* osc_state, double freq, double re, double im) {
-  double curr_output = osc_state->phase < 0 ? -1 : 1;
-  lpf_tick(&osc_state->lpf, re, im, dt, curr_output);
-
-  osc_state->phase += freq * dt;
- again:
-  if (curr_output < 0 && osc_state->phase > 0) {
-    double fdt = (osc_state->phase - 0.0) / (freq);
-    lpf_add_step(&osc_state->lpf, re, im, fdt, 2);
-    curr_output = 1;
+  double remaining = dt;
+  while (remaining > 0) {
+    double osc = osc_state->phase >= 0 ? 1 : -1;
+    double step = remaining;
+    double new_phase = osc_state->phase + freq * remaining;
+    if (osc_state->phase >= 0 && new_phase > 0.5) {
+      step = (0.5 - osc_state->phase) / freq;
+      new_phase = -0.5;
+    } else if (osc_state->phase < 0 && new_phase > 0) {
+      step = (0 - osc_state->phase) / freq;
+      new_phase = 0;
+    } else {
+      // initial assumption correct
+    }
+    lpf_tick(&osc_state->lpf, re, im, step, osc);
+    remaining -= step;
+    osc_state->phase = new_phase;
   }
-  if (osc_state->phase >= 0.5) {
-    double fdt = (osc_state->phase - 0.5) / (freq);
-    lpf_add_step(&osc_state->lpf, re, im, fdt, -2);
-    osc_state->phase -= 1;
-    curr_output = -1;
-    goto again;
-  }
-
   return lpf_sample(&osc_state->lpf);
 }
 
-static double tick_osc_saw(struct osc_state* osc_state, double freq, double re, double im) {
-  lpf_tick(&osc_state->lpf, re, im, dt, osc_state->phase + 0.5 * freq * dt);
-
-  osc_state->phase += freq * dt;
- again:
-  if (osc_state->phase >= 0.5) {
-    double fdt = (osc_state->phase - 0.5) / (freq);
-    lpf_add_step(&osc_state->lpf, re, im, fdt, -1);
-    osc_state->phase -= 1;
-    goto again;
+static double tick_osc_saw(struct osc_state* osc, double freq, double re, double im) {
+  double remaining = dt;
+  while (remaining > 0) {
+    double step = remaining;
+    double new_phase = osc->phase + freq * remaining;
+    if (new_phase >= 0.5) {
+      step = (0.5 - osc->phase) / freq;
+      new_phase = -0.5;
+    } else {
+      // initial assumption correct
+    }
+    lpf_tick(&osc->lpf, re, im, step, 2 * osc->phase + dt * freq);
+    remaining -= step;
+    osc->phase = new_phase;
   }
-
-  return 2 * lpf_sample(&osc_state->lpf);
+  return lpf_sample(&osc->lpf);
 }
 
 static void generate_audio(struct instance* instance, int start_frame, int end_frame) {
-  double cutoff = 440.0 * pow(2.0, (current_key - 69) / 12.0 * (instance->wrapper_cc[CC_TRACKING] / 127.0) + (instance->wrapper_cc[CC_CUTOFF] - 69 + 24 + 4) / 12.0) * M_PI;
-  double reso = instance->wrapper_cc[CC_RESONANCE] / 128.0;
-  double re = -cutoff * (1 - reso);
-  double im = cutoff * reso;
-  double volume = instance->wrapper_cc[CC_VOLUME] * instance->wrapper_cc[CC_VOLUME] / (127.0 * 127.0) * 0.25;
-  double vcf_decay_rate = 10000 * pow(instance->wrapper_cc[CC_VCF_DECAY] / 127.0, 2);
-  double smoothing_freq = 1000 * pow((1 + instance->wrapper_cc[CC_CLICK]) / 127.0, 2);
+  double cutoff = 2 * M_PI * 440.0 * pow(2.0,
+					 (instance->wrapper_cc[CC_CUTOFF] - 69 + 24 + 4) / 12.0 +
+					 (current_key - 45) / 12.0 * (instance->wrapper_cc[CC_CUTOFF_KBD] / 127.0)
+					 );
+  double reso = (0.5 + instance->wrapper_cc[CC_RESONANCE]) / 128.0;
+  double volume = pow(instance->wrapper_cc[CC_VOLUME]/ 127.0, 0.5) * 0.25;
+  double lfo_rate = 20 * pow(instance->wrapper_cc[CC_LFO_RATE]/127.0, 3);
+  double amp_decay_rate = 100 * pow(instance->wrapper_cc[CC_AMP_DECAY] / 127.0, 4);
+  double vcf_decay_rate = 10000 * pow(instance->wrapper_cc[CC_VCF_DECAY] / 127.0, 4);
+  double pitch_lfo = 0.5 * pow(instance->wrapper_cc[CC_PITCH_LFO]/127.0, 4);
+  double cutoff_lfo = 0.5 * pow(instance->wrapper_cc[CC_CUTOFF_LFO]/127.0, 4);
+  double smoothing_coeff = fmin(0.5, 1000 * pow((1 + instance->wrapper_cc[CC_CLICK]) / 128.0, 3) * dt);
   for (int i = start_frame; i < end_frame; ++i) {
+    // envelope
+    vcf_env -= vcf_env * fmin(0.5, vcf_env * vcf_env * vcf_decay_rate * dt);
+    amp_env -= amp_env * fmin(0.5, amp_decay_rate * dt);
 
-    vcf_env *= fmax(0.5, 1 - vcf_env * vcf_env * vcf_env * vcf_decay_rate * dt);
-    smoothed_vcf_env += (vcf_env - smoothed_vcf_env) * 2 * M_PI * smoothing_freq * dt;
+    // lfo
+    lfo_phase += lfo_rate * dt;
+    if (lfo_phase >= 1.0) { lfo_phase -= 1.0; }
+    double lfo = -1 + fabs(lfo_phase * 4 - 2);
 
-    smoothed_osc_freq += (osc_freq - smoothed_osc_freq) * 2 * M_PI * smoothing_freq * dt;
     
-    double vcf_out = tick_osc_saw(&osc_state, smoothed_osc_freq, re * vcf_env, im * vcf_env);
+    // declick
+    smoothed_vcf_env += (vcf_env - smoothed_vcf_env) * smoothing_coeff;
+    smoothed_osc_freq += (osc_freq - smoothed_osc_freq) * smoothing_coeff;
+    smoothed_amp += (volume * amp_env - smoothed_amp) * smoothing_coeff;
 
-    smoothed_amp += (volume * gain - smoothed_amp) * 2 * M_PI * smoothing_freq * dt;
-    audio_out_buf[i] = vcf_out * smoothed_amp;
+    // control values
+    double re = - cutoff * smoothed_vcf_env * (1 + lfo * cutoff_lfo) * sqrt(1 - reso);
+    double im =   cutoff * smoothed_vcf_env * (1 + lfo * cutoff_lfo) * sqrt(reso);
+
+    // audio path
+    audio_out_buf[i] = smoothed_amp * tick_osc_square(&osc_state, smoothed_osc_freq * (1 + lfo * pitch_lfo), re, im);
   }
 }
 
