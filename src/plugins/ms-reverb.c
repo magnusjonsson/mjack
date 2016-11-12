@@ -20,7 +20,6 @@ const unsigned plugin_ladspa_unique_id = 9;
 #define CC_WET_LEVEL 91
 #define CC_FEEDBACK 72
 #define CC_DECAY 80
-#define CC_DAMPING 81
 #define CC_STAGES 127 // TODO assign
 
 #define BUF_LEN 32
@@ -36,7 +35,6 @@ struct reverb {
   int tank_len;
   int base;
 };
-#define SQRT_ONE_HALF 0.707106781
 
 static double frand(void) {
   return rand() / (RAND_MAX + 1.0);
@@ -62,8 +60,6 @@ static void init(struct reverb* r, double nframes_per_second) {
   r->tank_buf = calloc(r->tank_len, sizeof(float)); // TODO don't leak
   init_buf_offs(r);
 }
-
-//static double z[NUM_STAGES];
 
 static void mix4(struct reverb* r, int s, int n, double k) {
   k *= 0.25;
@@ -151,7 +147,6 @@ void plugin_process(struct instance* instance, int nframes) {
   double reverb_gain = square(instance->wrapper_cc[CC_WET_LEVEL] * (2.0 / 127.0));
   double feedback_gain = -square(instance->wrapper_cc[CC_FEEDBACK] / 127.0);
   double decay_gain = instance->wrapper_cc[CC_DECAY] / 127.0;
-  //double damping_coeff = instance->wrapper_cc[CC_DAMPING] / 127.0; // TODO sample-rate depending
   int stage = instance->wrapper_cc[CC_STAGES] * (NUM_STAGES / 2) / 128;
   int io_base = 0;
   while (nframes > 0) {
@@ -184,7 +179,6 @@ void plugin_process(struct instance* instance, int nframes) {
       r->outbufs[0][io_base + i] = left;
       r->outbufs[1][io_base + i] = right;
     }
-    //    if (MIX_SIZE == 2) FOR(s, NUM_STAGES) mix2(r, s, n, decay_gain, damping_coef
     if (MIX_SIZE == 4) FOR(s, NUM_STAGES) mix4(r, s, n, 1 + decay_gain);
     if (MIX_SIZE == 8) FOR(s, NUM_STAGES) mix8(r, s, n, 1 + decay_gain);
     if (MIX_SIZE == 16) FOR(s, NUM_STAGES) mix16(r, s, n, 1 + decay_gain);
@@ -228,7 +222,6 @@ void plugin_init(struct instance* instance, double sample_rate) {
   wrapper_add_cc(instance, CC_WET_LEVEL, "Wet", "wet", 64);
   wrapper_add_cc(instance, CC_FEEDBACK, "Feedback", "feedback", 64);
   wrapper_add_cc(instance, CC_DECAY, "Decay", "decay", 64);
-  wrapper_add_cc(instance, CC_DAMPING, "Damping", "damping", 64);
   wrapper_add_cc(instance, CC_STAGES, "Stages", "stages", 64);
   printf("exit plugin_init\n");
 }
