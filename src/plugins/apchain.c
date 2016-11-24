@@ -9,13 +9,13 @@ const char* plugin_name = "APChain";
 const char* plugin_persistence_name = "mjack_apchain";
 const unsigned plugin_ladspa_unique_id = 2;
 
-#define NUM_STAGES 16
+#define NUM_STAGES 32
 #define FOR(var,limit) for(int var = 0; var < limit; ++var)
 #define CC_CUTOFF 77
 
 struct apchain {
-  float* inbuf;
-  float* outbuf;
+  float *inbuf;
+  float *outbuf;
 
   double dt;
 
@@ -85,7 +85,7 @@ static double ap_tick(double* state, double in, double apcoeff) {
 
 void plugin_process(struct instance* instance, int nframes) {
   struct apchain *a = instance->plugin;
-  double freq = 440.0 * pow(2.0, (instance->wrapper_cc[CC_CUTOFF] - 69 + 32) / 12.0);
+  double freq = 440.0 * pow(2.0, (instance->wrapper_cc[CC_CUTOFF] - 69) / 12.0);
   double apcoeff = calc_apcoeff(freq * a->dt);
   FOR(f, nframes) {
     double x = a->inbuf[f] + 1e-12;
