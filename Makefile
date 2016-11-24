@@ -1,6 +1,6 @@
 # Flags
 
-CFLAGS := -Wall -O3 -std=c99 -Xlinker -no-undefined -std=gnu99 -fvisibility=hidden -fopt-info -g
+CFLAGS := -Wall -O3 -std=c99 -Xlinker -no-undefined -std=gnu99 -fvisibility=hidden -g
 
 JACK_GTK_FLAGS := ${CFLAGS} $(shell pkg-config --libs --cflags gtk+-2.0 json-c jack) -lm
 
