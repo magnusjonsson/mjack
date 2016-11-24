@@ -28,7 +28,7 @@ const unsigned plugin_ladspa_unique_id = 9;
 struct reverb {
   float* inbufs[NUM_INS];
   float* outbufs[NUM_OUTS];
-  float buf[NUM_STAGES][MIX_SIZE][BUF_LEN];
+  float buf[NUM_STAGES][MIX_SIZE][BUF_LEN] __attribute__((aligned(64)));
   float buf_offs[NUM_STAGES][MIX_SIZE];
   double dt;
   float* tank_buf;
