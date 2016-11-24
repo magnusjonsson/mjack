@@ -28,6 +28,7 @@ static double dt;
 
 #define KNOBS \
   X(CC_VOLUME, 7, "Volume") \
+  X(CC_WAVEFORM, 120, "Waveform") \
   X(CC_CUTOFF, 77, "Cutoff") \
   X(CC_RESONANCE, 71, "Resonance") \
   X(CC_CUTOFF_KBD, 80, "Cutoff Kbd") \
@@ -196,6 +197,15 @@ static double tick_osc_saw(struct osc_state* osc, double freq, double re, double
   return lpf_sample(&osc->lpf);
 }
 
+static double tick_osc(struct osc_state* osc, int waveform, double freq, double re, double im) {
+  if (waveform < 64) {
+    return tick_osc_square(osc, freq, re, im);
+  } else {
+    return tick_osc_saw(osc, freq, re, im);
+  }
+}
+
+
 static void generate_audio(struct instance* instance, int start_frame, int end_frame) {
   double cutoff = 2 * M_PI * 440.0 * pow(2.0,
 					 (instance->wrapper_cc[CC_CUTOFF] - 69 + 24 + 4) / 12.0 +
@@ -209,6 +219,9 @@ static void generate_audio(struct instance* instance, int start_frame, int end_f
   double pitch_lfo = 0.5 * pow(instance->wrapper_cc[CC_PITCH_LFO]/127.0, 4);
   double cutoff_lfo = 0.5 * pow(instance->wrapper_cc[CC_CUTOFF_LFO]/127.0, 4);
   double smoothing_coeff = fmin(0.5, 1000 * pow((1 + instance->wrapper_cc[CC_CLICK]) / 128.0, 3) * dt);
+
+  int waveform = instance->wrapper_cc[CC_WAVEFORM];
+  
   for (int i = start_frame; i < end_frame; ++i) {
     // envelope
     vcf_env -= vcf_env * fmin(0.5, vcf_env * vcf_env * vcf_decay_rate * dt);
@@ -230,7 +243,7 @@ static void generate_audio(struct instance* instance, int start_frame, int end_f
     double im =   cutoff * smoothed_vcf_env * (1 + lfo * cutoff_lfo) * sqrt(reso);
 
     // audio path
-    audio_out_buf[i] = smoothed_amp * tick_osc_square(&osc_state, smoothed_osc_freq * (1 + lfo * pitch_lfo), re, im);
+    audio_out_buf[i] = smoothed_amp * tick_osc(&osc_state, waveform, smoothed_osc_freq * (1 + lfo * pitch_lfo), re, im);
   }
 }
 
