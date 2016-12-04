@@ -15,7 +15,7 @@ const unsigned plugin_ladspa_unique_id = 8;
 
 #define MAX_ORDER 4
 
-struct hpf {
+struct lpf {
   float *in;
   float *out;
 
@@ -24,21 +24,24 @@ struct hpf {
   double state[MAX_ORDER];
 };
 
-static void init(struct hpf* h, double sample_rate) {
+static void init(struct lpf* h, double sample_rate) {
   FOR(j, MAX_ORDER) h->state[j] = 0.0;
   h->dt = 1 / sample_rate;
 }
 
 void plugin_process(struct instance* instance, int nframes) {
-  struct hpf *h = instance->plugin;
-  double w = 2 * 3.141592 * 440 * pow(2.0, (instance->wrapper_cc[CC_CUTOFF] - 69) / 12.0);
+  struct lpf *h = instance->plugin;
+  double w = 2 * 3.141592 * 10.0 * pow(40000.0/10.0, instance->wrapper_cc[CC_CUTOFF] / 127.0);
   int order = 1 + instance->wrapper_cc[CC_ORDER] * MAX_ORDER / 128;
-  double k = -expm1(-w * h->dt);
+  double k = -expm1(-w * h->dt * sqrt(order));
   FOR(i, nframes) {
     double s = h->in[i];
     FOR(j, MAX_ORDER) {
       if (j < order) {
-	s = h->state[j] += (s - h->state[j]) * k;
+	double d = s - h->state[j];
+	h->state[j] += 0.5 * k * d;
+	s = h->state[j];
+	h->state[j] += 0.5 * k * d;
       } else {
 	h->state[j] = 0;
       }
@@ -48,7 +51,7 @@ void plugin_process(struct instance* instance, int nframes) {
 }
 
 void plugin_init(struct instance* instance, double sample_rate) {
-  struct hpf *h = calloc(1, sizeof(struct hpf));
+  struct lpf *h = calloc(1, sizeof(struct lpf));
   instance->plugin = h;
   init(h, sample_rate);
   wrapper_add_cc(instance, CC_CUTOFF, "Cutoff", "cutoff", 64);
