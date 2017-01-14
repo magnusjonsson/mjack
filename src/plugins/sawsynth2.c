@@ -157,7 +157,7 @@ static void handle_midi_event(struct instance *instance, const jack_midi_event_t
   }
 }
 
-static inline double tick_osc_square(struct osc_state* osc_state, double freq, double re, double im) {
+static inline double tick_osc_square(struct osc_state* osc_state, double freq, double re, double im, double threshold) {
   double remaining = dt;
   while (remaining > 0) {
     double osc = osc_state->phase >= 0 ? 1 : -1;
@@ -166,9 +166,9 @@ static inline double tick_osc_square(struct osc_state* osc_state, double freq, d
     if (osc_state->phase >= 0 && new_phase > 0.5) {
       step = (0.5 - osc_state->phase) / freq;
       new_phase = -0.5;
-    } else if (osc_state->phase < 0 && new_phase > 0) {
-      step = (0 - osc_state->phase) / freq;
-      new_phase = 0;
+    } else if (osc_state->phase < threshold && new_phase > threshold) {
+      step = (threshold - osc_state->phase) / freq;
+      new_phase = threshold;
     } else {
       // initial assumption correct
     }
@@ -198,9 +198,13 @@ static double tick_osc_saw(struct osc_state* osc, double freq, double re, double
 }
 
 static double tick_osc(struct osc_state* osc, int waveform, double freq, double re, double im) {
-  if (waveform < 64) {
-    return tick_osc_square(osc, freq, re, im);
-  } else {
+  if (waveform < 32) {
+    return tick_osc_square(osc, freq, re, im, 0);
+  }
+  else if (waveform < 64) {
+    return tick_osc_square(osc, freq, re, im, -0.25);
+  }
+  else {
     return tick_osc_saw(osc, freq, re, im);
   }
 }

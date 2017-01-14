@@ -51,6 +51,7 @@ JACK_GTK_TARGETS := \
 	kick3-jack-gtk \
 	monoroom-jack-gtk \
 	fm-jack-gtk \
+	dc-click-jack-gtk \
 
 
 TARGETS := ${LADSPA_TARGETS} ${JACK_GTK_TARGETS} ladder-filter-designer
