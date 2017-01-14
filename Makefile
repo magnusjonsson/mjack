@@ -1,12 +1,17 @@
 # Flags
 
-CFLAGS := -Wall -O3 -std=c99 -Xlinker -no-undefined -std=gnu99 -fvisibility=hidden
+CFLAGS := -Wall -O2 -ftree-vectorize -ffast-math -std=c99 -Xlinker -no-undefined -std=gnu99 -fvisibility=hidden
+LDFLAGS := -lm
 
-JACK_GTK_FLAGS := ${CFLAGS} $(shell pkg-config --libs --cflags gtk+-2.0 json-c jack) -lm
+JACK_GTK_CFLAGS := ${CFLAGS} $(shell pkg-config --cflags gtk+-2.0 json-c jack)
 
-LADSPA_FLAGS := ${CFLAGS} -fPIC -shared -lm
+JACK_GTK_LDFLAGS := ${LDFLAGS} $(shell pkg-config --libs  gtk+-2.0 json-c jack)
 
-LASH_FLAGS := ${CFLAGS} -llash -lm
+LADSPA_CFLAGS := ${CFLAGS} -fPIC -shared -lm
+LADSPA_LDFLAGS := ${LDFLAGS}
+
+LASH_CFLAGS := ${CFLAGS}
+LASH_LDFLAGS := ${LDFLAGS} -llash
 
 # Targets
 
@@ -69,19 +74,19 @@ install-ladspa : ${LADSPA_TARGETS}
 # Target rules
 
 %-ladspa.so : src/plugins/%.c ladspa-wrapper.o
-	gcc ${LADSPA_FLAGS} $^ -o $@
+	gcc ${LADSPA_CFLAGS} $^ ${LADSPA_LDFLAGS} -o $@
 
 %-jack-gtk : src/plugins/%.c jack-gtk-wrapper.o scala.o
-	gcc ${JACK_GTK_FLAGS} $^ -o $@
+	gcc ${JACK_GTK_CFLAGS} $^ ${JACK_GTK_LDFLAGS}  -o $@
 
 ladspa-wrapper.o : src/wrappers/ladspa-wrapper.c
-	gcc ${LADSPA_FLAGS} -c $^ -o $@
+	gcc ${LADSPA_CFLAGS} -c $^ -o $@
 
 jack-gtk-wrapper.o : src/wrappers/jack-gtk-wrapper.c
-	gcc ${JACK_GTK_FLAGS} -c $^ -o $@
+	gcc ${JACK_GTK_CFLAGS} -c $^ -o $@
 
 scala.o : src/tuning/scala.c
-	gcc ${JACK_GTK_FLAGS} -c $^ -o $@
+	gcc ${JACK_GTK_CFLAGS} -c $^ -o $@
 
 # Misc
 
