@@ -1,4 +1,3 @@
-#include <jack/midiport.h>
 #include <stdio.h>
 #include <math.h>
 #include <stdbool.h>
@@ -69,7 +68,7 @@ static void handle_midi_note_on(int key, int velocity) {
   }
 }
 
-static void handle_midi_event(const jack_midi_event_t* event) {
+static void handle_midi_event(const struct midi_event *event) {
   switch (event->buffer[0] & 0xf0) {
   case 0x80:
     handle_midi_note_off(event->buffer[1], event->buffer[2]);
@@ -129,11 +128,10 @@ static void generate_audio(struct instance* instance, int start_frame, int end_f
 }
 
 void plugin_process(struct instance* instance, int nframes) {
-  jack_nframes_t num_events = jack_midi_get_event_count(midi_in_buf);
+  int num_events = wrapper_get_num_midi_events(midi_in_buf);
   int sample_index = 0;
   FOR(e, num_events) {
-    jack_midi_event_t event;
-    jack_midi_event_get(&event, midi_in_buf, e);
+    struct midi_event event = wrapper_get_midi_event(midi_in_buf, e);
     handle_midi_event(&event);
     if (sample_index < event.time) {
       generate_audio(instance, sample_index, event.time);

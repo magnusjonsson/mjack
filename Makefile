@@ -4,10 +4,9 @@ CFLAGS := -Wall -O2 -ftree-vectorize -ffast-math -std=c99 -Xlinker -no-undefined
 LDFLAGS := -lm
 
 JACK_GTK_CFLAGS := ${CFLAGS} $(shell pkg-config --cflags gtk+-2.0 json-c jack)
-
 JACK_GTK_LDFLAGS := ${LDFLAGS} $(shell pkg-config --libs  gtk+-2.0 json-c jack)
 
-LADSPA_CFLAGS := ${CFLAGS} -fPIC -shared -lm
+LADSPA_CFLAGS := ${CFLAGS} -fPIC -shared
 LADSPA_LDFLAGS := ${LDFLAGS}
 
 LASH_CFLAGS := ${CFLAGS}
@@ -59,7 +58,7 @@ JACK_GTK_TARGETS := \
 	dc-click-jack-gtk \
 
 
-TARGETS := ${LADSPA_TARGETS} ${JACK_GTK_TARGETS} ladder-filter-designer
+TARGETS := ${JACK_GTK_TARGETS} ${LADSPA_TARGETS} ladder-filter-designer
 
 # Toplevel rules
 

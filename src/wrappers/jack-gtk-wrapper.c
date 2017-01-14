@@ -4,6 +4,7 @@
 #include <memory.h>
 #include <jack/jack.h>
 #include <jack/session.h>
+#include <jack/midiport.h>
 #include <math.h>
 #include <gtk/gtk.h>
 #include <json.h>
@@ -264,6 +265,20 @@ void wrapper_add_midi_input(struct instance* _instance, const char* name, void**
   int i = jack_num_ports++;
   jack_port[i] = jack_port_register(jack_client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
   jack_buf[i] = (void**) buf;
+}
+
+int wrapper_get_num_midi_events(void *buf) {
+  return jack_midi_get_event_count(buf);
+}
+
+struct midi_event wrapper_get_midi_event(void *buf, int i) {
+  jack_midi_event_t event;
+  jack_midi_event_get(&event, buf, i);
+  return (struct midi_event) {
+    .time = event.time,
+    .size = event.size,
+    .buffer = event.buffer,
+  };
 }
 
 int main(int argc, char** argv) {

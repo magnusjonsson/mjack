@@ -14,6 +14,14 @@ extern void wrapper_add_audio_input(struct instance* instance, const char* name,
 extern void wrapper_add_audio_output(struct instance* instance, const char* name, float** buf);
 extern void wrapper_add_midi_input(struct instance* instance, const char* name, void** buf);
 
+struct midi_event {
+  int time;
+  int size;
+  const unsigned char *buffer;
+};
+extern int wrapper_get_num_midi_events(void *buf);
+extern struct midi_event wrapper_get_midi_event(void *buf, int i);
+
 extern void plugin_init(struct instance* instance, double sample_rate);
 extern void plugin_destroy(struct instance* instance);
 extern void plugin_process(struct instance* instance, int nframes);
