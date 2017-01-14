@@ -70,7 +70,7 @@ static void recompute(struct reverb *r) {
   float delta_predelay = 0.01 * pow(10.0, r->cc[CC_PD]/64.0 - 1.0);
   float sqrt_damping = 100.0 * pow(r->cc[CC_DAMPING]/127.0, 4.0);
   FOR(i, NUM_DELAYS) {
-    float freq = base_freq + delta_freq * (i + r->delay[i].freq_randoms);
+    float freq = base_freq + delta_freq * ((NUM_DELAYS - 1 - i) + r->delay[i].freq_randoms);
     float predelay = base_predelay + delta_predelay * (i + r->delay[i].predelay_randoms);
     float seconds = 1 / freq;
     float sqrt_seconds = sqrtf(seconds);
@@ -150,19 +150,7 @@ void plugin_process(struct instance *instance, int nframes) {
       float       *pfi = &r->delay[j].buf[pos2];
       float       *pfb = &r->delay[j].buf[pos3];
       float       *pout = &outbuf[i];
-      int k = 0;
-      // inner loop, unrolled once
-      for(; k < n - 1; k += 2) {
-	float lpstate0 = lpstate * lpcoeff_mirror   + pfb[k] * fbgain_lpcoeff;
-	float lpstate1 = lpstate * lpcoeff_mirror_2 + pfb[k] * fbgain_lpcoeff_lpcoeff_mirror + pfb[k+1] * fbgain_lpcoeff;
-	pfi[k] = lpstate0 + pin[k] * ingain;
-	pout[k] += lpstate0;
-	pfi[k+1] = lpstate1 + pin[k+1] * ingain;
-	pout[k+1] += lpstate1;
-	lpstate = lpstate1;
-      }
-      // inner loop, remainder
-      for(; k < n; k++) {
+      for(int k = 0; k < n; k++) {
 	lpstate = lpstate * lpcoeff_mirror + pfb[k] * fbgain_lpcoeff;
 	pfi[k] = lpstate + pin[k] * ingain;
 	pout[k] += lpstate;
