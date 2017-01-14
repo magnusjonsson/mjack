@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <math.h>
-#include <limits.h>
-#include <unistd.h>
 #include "../wrappers/wrapper.h"
 #include "../dsp/biquad.h"
 

@@ -26,14 +26,14 @@ static inline struct biquad_params biquad_prewarp(struct biquad_params _) {
   };
 };
 
-inline struct biquad_coeffs biquad_analog_parametric(struct biquad_params _) {
+static inline struct biquad_coeffs biquad_analog_parametric(struct biquad_params _) {
   return (struct biquad_coeffs) {
     .b2 =       _.g2, .b1 = _.w / _.Q * _.g1, .b0 = _.w * _.w * _.g0,
     .a2 = 1.0 / _.g2, .a1 = _.w / _.Q / _.g1, .a0 = _.w * _.w / _.g0,
   };
 }
 
-inline struct biquad_coeffs biquad_analog_parametric_asymmetric(struct biquad_params _) {
+static inline struct biquad_coeffs biquad_analog_parametric_asymmetric(struct biquad_params _) {
   return (struct biquad_coeffs) {
     .b2 = _.g2, .b1 = _.w / _.Q * _.g1, .b0 = _.w * _.w * _.g0,
     .a2 = 1.0,  .a1 = _.w / _.Q       , .a0 = _.w * _.w,

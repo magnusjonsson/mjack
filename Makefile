@@ -1,6 +1,6 @@
 # Flags
 
-CFLAGS := -Wall -O3 -std=c99 -Xlinker -no-undefined -std=gnu99 -fvisibility=hidden -g
+CFLAGS := -Wall -O3 -std=c99 -Xlinker -no-undefined -std=gnu99 -fvisibility=hidden
 
 JACK_GTK_FLAGS := ${CFLAGS} $(shell pkg-config --libs --cflags gtk+-2.0 json-c jack) -lm
 
@@ -71,13 +71,16 @@ install-ladspa : ${LADSPA_TARGETS}
 %-ladspa.so : src/plugins/%.c ladspa-wrapper.o
 	gcc ${LADSPA_FLAGS} $^ -o $@
 
-%-jack-gtk : src/plugins/%.c jack-gtk-wrapper.o
+%-jack-gtk : src/plugins/%.c jack-gtk-wrapper.o scala.o
 	gcc ${JACK_GTK_FLAGS} $^ -o $@
 
 ladspa-wrapper.o : src/wrappers/ladspa-wrapper.c
 	gcc ${LADSPA_FLAGS} -c $^ -o $@
 
 jack-gtk-wrapper.o : src/wrappers/jack-gtk-wrapper.c
+	gcc ${JACK_GTK_FLAGS} -c $^ -o $@
+
+scala.o : src/tuning/scala.c
 	gcc ${JACK_GTK_FLAGS} -c $^ -o $@
 
 # Misc

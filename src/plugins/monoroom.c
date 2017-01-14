@@ -133,8 +133,6 @@ void plugin_process(struct instance *instance, int nframes) {
     float lpstate = r->delay[j].lpstate;
     float fbgain_lpcoeff = r->delay[j].fbgain_lpcoeff;
     float lpcoeff_mirror = r->delay[j].lpcoeff_mirror;
-    float lpcoeff_mirror_2 = lpcoeff_mirror * lpcoeff_mirror;
-    float fbgain_lpcoeff_lpcoeff_mirror = fbgain_lpcoeff * lpcoeff_mirror;
     float ingain = r->delay[j].ingain;
     int predelay_len = r->delay[j].predelay_len;
     int len = r->delay[j].len;
