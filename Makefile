@@ -62,6 +62,8 @@ JACK_GTK_TARGETS := \
 
 LV2_TARGETS := lv2/synth.so validate_lv2
 
+LV2_INSTALL_DIR := /usr/lib/lv2/mjack.lv2
+
 TARGETS := ${LV2_TARGETS} ${JACK_GTK_TARGETS} ${LADSPA_TARGETS} ladder-filter-designer
 
 # Toplevel rules
@@ -73,6 +75,10 @@ clean:
 
 install-ladspa : ${LADSPA_TARGETS}
 	cp $^ /usr/local/lib/ladspa/
+
+install-lv2 : ${LV2_TARGETS}
+	mkdir -p ${LV2_INSTALL_DIR}
+	install lv2/*.ttl lv2/*.so ${LV2_INSTALL_DIR}/
 
 # Target rules
 

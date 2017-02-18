@@ -1,5 +1,6 @@
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "lv2/lv2plug.in/ns/ext/atom/atom.h"
 #include "lv2/lv2plug.in/ns/ext/atom/util.h"
@@ -9,37 +10,82 @@
 
 #define SYNTH_URI "urn:magnusjonsson:mjack:lv2:synth"
 
+#include "lv2utils.h"
+
 enum port_index {
   PORT_CONTROL = 0,
   PORT_OUT = 1,
 };
 
-struct synth {
-  const LV2_Atom_Sequence *control;
-
-  LV2_URID midi_event_type;
-  
-  float *out;
+struct osc {
+  double phase;
 };
 
-static void *get_host_feature(const LV2_Feature *const *host_features, const char *uri) {
-  for (int i = 0; host_features[i]; i++) {
-    if (strcmp(host_features[i]->URI, uri) == 0) {
-      return host_features[i]->data;
-    }
+static double osc_tick_saw(struct osc *self, double freq) {
+  double out = self->phase;
+  self->phase += freq;
+  while (self->phase >= 0.5) {
+    self->phase -= 1.0;
   }
-  return NULL;
+  return out;
 }
+
+struct cv {
+  double freq;
+  double gate;
+};
+
+struct midi_to_cv {
+  uint8_t current_note;
+  struct cv cv;
+};
+
+static void midi_to_cv_handle_midi(struct midi_to_cv *self, const uint8_t *msg) {
+  switch (lv2_midi_message_type(msg)) {
+  case LV2_MIDI_MSG_NOTE_ON:
+    fprintf(stderr, "Note on %i %i\n", msg[1], msg[2]);
+    if (msg[2] != 0) {
+      self->current_note = msg[1];
+      self->cv.freq = 440 * pow(2.0, (msg[1] - 69) / 12.0);
+      self->cv.gate = msg[2] / 127.0;
+      break;
+    }
+    // fall through
+  case LV2_MIDI_MSG_NOTE_OFF:
+    fprintf(stderr, "Note off %i %i\n", msg[1], msg[2]);
+    if (msg[1] == self->current_note) {
+      self->cv.gate = 0;
+    }
+    break;
+  default:
+    break;
+  }
+}
+
+struct synth {
+  LV2_URID midi_event_type;
+  const LV2_Atom_Sequence *control;
+  float *out;
+  double dt;
+  struct midi_to_cv midi_to_cv;
+  struct osc osc;
+};
 
 static LV2_Handle instantiate(const LV2_Descriptor *descriptor,
 			      double sample_rate,
 			      const char *bundle_path,
 			      const LV2_Feature *const *host_features) {
+  fprintf(stderr, "%s called!", __func__);
   struct synth *self = calloc(1, sizeof(struct synth));
+  self->dt = 1.0 / sample_rate;
   LV2_URID_Map *urid_map = get_host_feature(host_features, LV2_URID__map);
-  if (!urid_map) { goto error; }
+  if (!urid_map) {
+    fprintf(stderr, "Could not get URID map host feature\n");
+    goto err;
+  }
   self->midi_event_type = urid_map->map(urid_map->handle, LV2_MIDI__MidiEvent);
- error:
+  return self;
+ err:
   free(self);
   return NULL;
 }
@@ -57,9 +103,9 @@ static void activate(LV2_Handle instance) {
 
 static void handle_midi(struct synth *self, const uint8_t *msg) {
   switch (lv2_midi_message_type(msg)) {
-  case LV2_MIDI_MSG_NOTE_ON:
-    break;
+  case LV2_MIDI_MSG_NOTE_ON: // fall through
   case LV2_MIDI_MSG_NOTE_OFF:
+    midi_to_cv_handle_midi(&self->midi_to_cv, msg);
     break;
   case LV2_MIDI_MSG_PGM_CHANGE:
     break;
@@ -68,10 +114,10 @@ static void handle_midi(struct synth *self, const uint8_t *msg) {
   }
 }
 
-static void run_audio(struct synth *self, uint32_t offset, uint32_t len) {
-  if (len == 0) { return; }
-  for (int i = offset; i < len; i++) {
-    self->out[i] = 0.0f;
+static void run_audio(struct synth *self, uint32_t offset, uint32_t end) {
+  if (offset == end) { return; }
+  for (int i = offset; i < end; i++) {
+    self->out[i] = osc_tick_saw(&self->osc, self->midi_to_cv.cv.freq * self->dt) * self->midi_to_cv.cv.gate;
   }
 }
 
@@ -79,14 +125,14 @@ static void run(LV2_Handle handle, uint32_t nframes) {
   struct synth *self = handle;
   uint32_t offset = 0;
   LV2_ATOM_SEQUENCE_FOREACH(self->control, ev) {
-    run_audio(self, offset, ev->time.frames - offset);
+    run_audio(self, offset, ev->time.frames);
     if (ev->body.type == self->midi_event_type) {
       const uint8_t *const msg = (const uint8_t *)(ev + 1);
       handle_midi(self, msg);
     }
     offset = ev->time.frames;
   }
-  run_audio(self, offset, nframes - offset);
+  run_audio(self, offset, nframes);
 }
 
 static void deactivate(LV2_Handle instance) {
@@ -112,6 +158,7 @@ static const LV2_Descriptor descriptor = {
 };
 
 LV2_SYMBOL_EXPORT const LV2_Descriptor *lv2_descriptor(uint32_t index) {
+  fprintf(stderr, "%s called!", __func__);
   switch (index) {
   case 0:  return &descriptor;
   default: return NULL;

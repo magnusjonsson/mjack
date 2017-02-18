@@ -19,7 +19,7 @@ struct biquad_params {
 };
 
 static inline struct biquad_params biquad_prewarp(struct biquad_params _) {
-  double t = tan(0.5 * fmin(3.14, _.w));
+  double t = tan(0.5 * fmin(3.141592, _.w));
   return (struct biquad_params) {
     .w = t, .Q = _.Q / (1.0 + t * t),
     .g2 = _.g2, .g1 = _.g1, .g0 = _.g0,
