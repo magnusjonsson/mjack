@@ -7,7 +7,7 @@
 #include "lv2/lv2plug.in/ns/ext/urid/urid.h"
 #include "lv2/lv2plug.in/ns/lv2core/lv2.h"
 
-#define SYNTH_URI "http://mjack/synth/"
+#define SYNTH_URI "urn:magnusjonsson:mjack:lv2:synth"
 
 enum port_index {
   PORT_CONTROL = 0,

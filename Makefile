@@ -1,6 +1,6 @@
 # Flags
 
-CFLAGS := -Wall -O2 -ftree-vectorize -ffast-math -std=c99 -Xlinker -no-undefined -std=gnu99 -fvisibility=hidden
+CFLAGS := -Wall -O2 -ftree-vectorize -ffast-math -Xlinker -no-undefined -std=gnu99 -fvisibility=hidden
 LDFLAGS := -lm
 
 JACK_GTK_CFLAGS := ${CFLAGS} $(shell pkg-config --cflags gtk+-2.0 json-c jack)
@@ -11,6 +11,9 @@ LADSPA_LDFLAGS := ${LDFLAGS}
 
 LASH_CFLAGS := ${CFLAGS}
 LASH_LDFLAGS := ${LDFLAGS} -llash
+
+LV2_CFLAGS := ${CFLAGS}
+LV2_LDFLAGS := ${LDFLAGS} -fPIC -shared
 
 # Targets
 
@@ -57,8 +60,9 @@ JACK_GTK_TARGETS := \
 	fm-jack-gtk \
 	dc-click-jack-gtk \
 
+LV2_TARGETS := lv2/synth.so validate_lv2
 
-TARGETS := ${JACK_GTK_TARGETS} ${LADSPA_TARGETS} ladder-filter-designer
+TARGETS := ${LV2_TARGETS} ${JACK_GTK_TARGETS} ${LADSPA_TARGETS} ladder-filter-designer
 
 # Toplevel rules
 
@@ -87,6 +91,9 @@ jack-gtk-wrapper.o : src/wrappers/jack-gtk-wrapper.c
 scala.o : src/tuning/scala.c
 	gcc ${JACK_GTK_CFLAGS} -c $^ -o $@
 
+lv2/synth.so : lv2/synth.c
+	gcc ${LV2_CFLAGS} $^ ${LV2_LDFLAGS} -o $@
+
 # Misc
 
 ladder-filter-designer : src/ladder-filter-designer.c
@@ -94,3 +101,14 @@ ladder-filter-designer : src/ladder-filter-designer.c
 
 dummylash : src/dummylash.c
 	gcc ${LASH_FLAGS} $^ -o $@
+
+validate_lv2:
+	sord_validate -l \
+		/usr/lib/lv2/schemas.lv2/*.ttl \
+		/usr/lib/lv2/lv2core.lv2/lv2core.ttl \
+		/usr/lib/lv2/urid.lv2/urid.ttl \
+		/usr/lib/lv2/atom.lv2/atom.ttl \
+		/usr/lib/lv2/ui.lv2/ui.ttl \
+		/usr/lib/lv2/midi.lv2/midi.ttl \
+		/usr/lib/lv2/event.lv2/event.ttl \
+		lv2/*.ttl
