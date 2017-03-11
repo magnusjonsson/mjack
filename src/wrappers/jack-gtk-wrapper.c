@@ -1,4 +1,5 @@
 #include "wrapper.h"
+#include <stdbool.h>
 #include "../tuning/scala.h"
 #include <getopt.h>
 #include <memory.h>
@@ -146,7 +147,17 @@ static void load_scale(void) {
 				NULL);
   if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
     char *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
-    load_scala_file(filename, instance.cents, instance.freq);
+    bool ok = load_scala_file(filename, instance.cents, instance.freq);
+    if (!ok) {
+      GtkWidget *error_dialog = gtk_message_dialog_new(GTK_WINDOW(window),
+						       GTK_DIALOG_DESTROY_WITH_PARENT,
+						       GTK_MESSAGE_ERROR,
+						       GTK_BUTTONS_CLOSE,
+						       "Error reading “%s”",
+						       filename);
+      gtk_dialog_run(GTK_DIALOG(error_dialog));
+      gtk_widget_destroy (error_dialog);
+    }
     g_free(filename);
   }
 

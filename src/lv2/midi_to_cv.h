@@ -38,9 +38,13 @@ static void midi_to_cv_handle_midi(struct midi_to_cv *self, const uint8_t *msg) 
 }
 
 
-static void midi_to_cv_load_scala_file(struct midi_to_cv *self, const char *filename) {
+static bool midi_to_cv_load_scala_file(struct midi_to_cv *self, const char *filename) {
   fprintf(stderr, "%s\n", __func__);
   float cents[128];
-  load_scala_file(filename, cents, self->freq);
+  if (!load_scala_file(filename, cents, self->freq)) {
+    fprintf(stderr, "Failed to load scala file %s\n", filename);
+    return false;
+  }
   self->cv.freq = self->freq[self->current_note];
+  return true;
 }

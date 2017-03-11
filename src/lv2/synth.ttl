@@ -2,29 +2,137 @@
 @prefix doap:  <http://usefulinc.com/ns/doap#> .
 @prefix lv2:   <http://lv2plug.in/ns/lv2core#> .
 @prefix midi: <http://lv2plug.in/ns/ext/midi#> .
-@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix patch: <http://lv2plug.in/ns/ext/patch#> .
+@prefix state: <http://lv2plug.in/ns/ext/state#> .
 @prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix units: <http://lv2plug.in/ns/extensions/units#> .
 @prefix urid: <http://lv2plug.in/ns/ext/urid#> .
+
+<urn:magnusjonsson:mjack:lv2:synth#scala_file>
+	a lv2:Parameter ;
+	rdfs:label "Scala .scl file" ;
+	rdfs:range atom:Path .
 
 <urn:magnusjonsson:mjack:lv2:synth>
         a lv2:Plugin , lv2:InstrumentPlugin ;
         doap:name "Synth" ;
         doap:license <https://opensource.org/licenses/GPL-2.0> ;
         lv2:optionalFeature lv2:hardRTCapable ;
-	lv2:requiredFeature urid:map ;
+	lv2:requiredFeature urid:map , urid:unmap ;
+	lv2:extensionData state:interface ;
         lv2:port [
 		 a lv2:InputPort , atom:AtomPort ;
 		 atom:bufferType atom:Sequence ;
-		 atom:supports midi:MidiEvent ;
+		 atom:supports midi:MidiEvent ,
+		 	       patch:Message ;
+		 lv2:designation lv2:control ;
 		 lv2:index 0 ;
 		 lv2:symbol "control" ;
 		 lv2:name "Control" ;
-		 
+	] ;
+        lv2:port [
+		 a lv2:OutputPort , atom:AtomPort ;
+		 atom:bufferType atom:Sequence ;
+		 atom:supports patch:Message ;
+		 lv2:designation lv2:control ;
+		 lv2:index 1 ;
+		 lv2:symbol "notify" ;
+		 lv2:name "Notify" ;
 	] ;
 	lv2:port [
 	        a lv2:OutputPort , lv2:AudioPort ;
-                lv2:index 1 ;
+                lv2:index 2 ;
                 lv2:symbol "out" ;
                 lv2:name "Out" ;
-	] .
+	] ;
+
+	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 3 ;
+		 lv2:symbol "vibrato_1_rate" ;
+		 lv2:name "Vibrato 1 Rate" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 20 ;
+		 lv2:default 5 ;
+	] ;
+	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 4 ;
+		 lv2:symbol "vibrato_1_depth" ;
+		 lv2:name "Vibrato 1 Depth" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 0.05 ;
+		 lv2:default 0.01 ;
+	] ;
+
+	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 5 ;
+		 lv2:symbol "vibrato_2_rate" ;
+		 lv2:name "Vibrato 2 Rate" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 20 ;
+		 lv2:default 5 ;
+	] ;
+	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 6 ;
+		 lv2:symbol "vibrato_2_depth" ;
+		 lv2:name "Vibrato 2 Depth" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 0.05 ;
+		 lv2:default 0.01 ;
+	] ;
+
+	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 7 ;
+		 lv2:symbol "vibrato_3_rate" ;
+		 lv2:name "Vibrato 3 Rate" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 20 ;
+		 lv2:default 5 ;
+	] ;
+	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 8 ;
+		 lv2:symbol "vibrato_3_depth" ;
+		 lv2:name "Vibrato 3 Depth" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 0.05 ;
+		 lv2:default 0.01 ;
+	] ;
+	
+	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 9 ;
+		 lv2:symbol "octave" ;
+		 lv2:name "Octave" ;
+		 lv2:portProperty lv2:integer ;
+		 lv2:minimum -2 ;
+		 lv2:maximum 2 ;
+		 lv2:default 0 ;
+	] ;
+
+	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 10 ;
+		 lv2:symbol "waveform" ;
+		 lv2:name "Waveform" ;
+		 lv2:portProperty lv2:integer ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 23 ;
+		 lv2:default 0 ;
+	] ;
+	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 11 ;
+		 lv2:symbol "speed" ;
+		 lv2:name "Speed" ;
+		 lv2:minimum 0.1 ;
+		 lv2:maximum 1000 ;
+		 lv2:default 1000 ;
+		 ] ;
+
+	patch:writable <urn:magnusjonsson:mjack:lv2:synth#scala_file> ;
+.

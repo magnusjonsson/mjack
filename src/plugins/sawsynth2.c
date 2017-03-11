@@ -65,7 +65,6 @@ static double vcf_env;
 static double osc_freq;
 static double lfo_phase;
 
-
 struct lpf {
   double re;
   double im;

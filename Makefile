@@ -60,7 +60,7 @@ JACK_GTK_TARGETS := \
 	fm-jack-gtk \
 	dc-click-jack-gtk \
 
-LV2_TARGETS := lv2/synth.so validate_lv2
+LV2_TARGETS := src/lv2/synth.so validate_lv2
 
 LV2_INSTALL_DIR := /usr/lib/lv2/mjack.lv2
 
@@ -78,7 +78,7 @@ install-ladspa : ${LADSPA_TARGETS}
 
 install-lv2 : ${LV2_TARGETS}
 	mkdir -p ${LV2_INSTALL_DIR}
-	install lv2/*.ttl lv2/*.so ${LV2_INSTALL_DIR}/
+	install src/lv2/*.ttl src/lv2/*.so ${LV2_INSTALL_DIR}/
 
 # Target rules
 
@@ -97,7 +97,7 @@ jack-gtk-wrapper.o : src/wrappers/jack-gtk-wrapper.c
 scala.o : src/tuning/scala.c
 	gcc ${JACK_GTK_CFLAGS} -c $^ -o $@
 
-lv2/synth.so : lv2/synth.c
+src/lv2/synth.so : src/lv2/synth.c src/tuning/scala.c
 	gcc ${LV2_CFLAGS} $^ ${LV2_LDFLAGS} -o $@
 
 # Misc
@@ -110,11 +110,13 @@ dummylash : src/dummylash.c
 
 validate_lv2:
 	sord_validate -l \
-		/usr/lib/lv2/schemas.lv2/*.ttl \
-		/usr/lib/lv2/lv2core.lv2/lv2core.ttl \
-		/usr/lib/lv2/urid.lv2/urid.ttl \
 		/usr/lib/lv2/atom.lv2/atom.ttl \
-		/usr/lib/lv2/ui.lv2/ui.ttl \
-		/usr/lib/lv2/midi.lv2/midi.ttl \
 		/usr/lib/lv2/event.lv2/event.ttl \
-		lv2/*.ttl
+		/usr/lib/lv2/lv2core.lv2/lv2core.ttl \
+		/usr/lib/lv2/midi.lv2/midi.ttl \
+		/usr/lib/lv2/patch.lv2/patch.ttl \
+		/usr/lib/lv2/state.lv2/state.ttl \
+		/usr/lib/lv2/schemas.lv2/*.ttl \
+		/usr/lib/lv2/ui.lv2/ui.ttl \
+		/usr/lib/lv2/urid.lv2/urid.ttl \
+		src/lv2/*.ttl

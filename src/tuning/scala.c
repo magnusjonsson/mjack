@@ -17,7 +17,7 @@ static char *read_scala_line(char *buf, size_t len, FILE *fp) {
   }
 }
 
-void load_scala_file(const char *filename, float out_cents[static 128], float out_freq[static 128]) {
+bool load_scala_file(const char *filename, float out_cents[static 128], float out_freq[static 128]) {
   FILE *fp = fopen(filename, "rt");
   if (!fp) {
     fprintf(stdout, "Could not open scala file %s\n", filename);
@@ -81,6 +81,8 @@ void load_scala_file(const char *filename, float out_cents[static 128], float ou
     if (out_freq) out_freq[i] = key_freq;
     if (out_cents) out_cents[i] = key_cents;
   }
+  return true;
  err:
   fclose(fp);
+  return false;
 }
