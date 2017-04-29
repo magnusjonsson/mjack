@@ -20,7 +20,7 @@ static double osc_tick_sin(struct osc *self, double freq) {
 static double osc_tick_saw(struct osc *self, double freq) {
   double phase = self->phase;
   osc_tick_phase(self, freq);
-  return phase*2 - 1;
+  return 2 * phase - 1;
 }
 
 static double osc_tick_duty(struct osc *self, double freq, double duty) {
@@ -39,6 +39,12 @@ static double osc_tick_saw_box(struct osc *self, double freq) {
   double para0 = phase0 * phase0;
   double para1 = phase1 * phase1;
   return (para1 - para0) / freq;
+}
+
+static double osc_tick_triangle_duty(struct osc *self, double freq, double duty) {
+  double phase = self->phase;
+  osc_tick_phase(self, freq);
+  return 8 * fmin(phase * (1 - duty), (1 - phase) * duty) - 1;
 }
 
 static double osc_tick_duty_box(struct osc *self, double freq, double duty) {
