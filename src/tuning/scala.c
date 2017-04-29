@@ -83,6 +83,8 @@ bool load_scala_file(const char *filename, float out_cents[static 128], float ou
   }
   return true;
  err:
-  fclose(fp);
+  if (fp) {
+    fclose(fp);
+  }
   return false;
 }
