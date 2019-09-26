@@ -18,20 +18,28 @@
 #include "cv.h"
 #include "midi_to_cv.h"
 #include "osc.h"
+#include "env.h"
 
 enum port {
-  PORT_CONTROL = 0,
-  PORT_NOTIFY = 1,
-  PORT_OUT = 2,
-  PORT_VIBRATO_1_RATE = 3,
+  PORT_CONTROL         = 0,
+  PORT_NOTIFY          = 1,
+  PORT_OUT             = 2,
+  PORT_VIBRATO_1_RATE  = 3,
   PORT_VIBRATO_1_DEPTH = 4,
-  PORT_VIBRATO_2_RATE = 5,
-  PORT_VIBRATO_2_DEPTH = 6,
-  PORT_VIBRATO_3_RATE = 7,
-  PORT_VIBRATO_3_DEPTH = 8,
-  PORT_OCTAVE = 9,
-  PORT_WAVEFORM = 10,
-  PORT_SPEED = 11,
+  PORT_TREMOLO_1_DEPTH = 5,
+  PORT_VIBRATO_2_RATE  = 6,
+  PORT_VIBRATO_2_DEPTH = 7,
+  PORT_TREMOLO_2_DEPTH = 8,
+  PORT_VIBRATO_3_RATE  = 9,
+  PORT_VIBRATO_3_DEPTH = 10,
+  PORT_TREMOLO_3_DEPTH = 11,
+  PORT_OCTAVE          = 12,
+  PORT_WAVEFORM        = 13,
+  PORT_SPEED           = 14,
+  PORT_DECAY           = 15,
+  PORT_SUSTAIN         = 16,
+  PORT_RELEASE         = 17,
+  PORT_RETRIGGER       = 18,
 };
 
 #define NUM_VIBRATOS 3
@@ -53,18 +61,22 @@ struct synth {
 
   const float *vibrato_rate[NUM_VIBRATOS];
   const float *vibrato_depth[NUM_VIBRATOS];
+  const float *tremolo_depth[NUM_VIBRATOS];
   const float *octave;
   const float *waveform;
   const float *speed;
+  const float *decay;
+  const float *sustain;
+  const float *release;
+  const float *retrigger;
 
   char scala_file[PATH_MAX];
-
-  double amp;
 
   struct osc vibrato_lfo[NUM_VIBRATOS];
 
   struct midi_to_cv midi_to_cv;
   struct osc osc;
+  struct env env;
 };
 
 static LV2_Handle instantiate(const LV2_Descriptor *descriptor,
@@ -108,13 +120,20 @@ static void connect_port(LV2_Handle instance, uint32_t port, void *data) {
   case PORT_OUT: self->out = data; break;
   case PORT_VIBRATO_1_RATE: self->vibrato_rate[0] = data; break;
   case PORT_VIBRATO_1_DEPTH: self->vibrato_depth[0] = data; break;
+  case PORT_TREMOLO_1_DEPTH: self->tremolo_depth[0] = data; break;
   case PORT_VIBRATO_2_RATE: self->vibrato_rate[1] = data; break;
   case PORT_VIBRATO_2_DEPTH: self->vibrato_depth[1] = data; break;
+  case PORT_TREMOLO_2_DEPTH: self->tremolo_depth[1] = data; break;
   case PORT_VIBRATO_3_RATE: self->vibrato_rate[2] = data; break;
   case PORT_VIBRATO_3_DEPTH: self->vibrato_depth[2] = data; break;
+  case PORT_TREMOLO_3_DEPTH: self->tremolo_depth[2] = data; break;
   case PORT_OCTAVE: self->octave = data; break;
   case PORT_WAVEFORM: self->waveform = data; break;
   case PORT_SPEED: self->speed = data; break;
+  case PORT_DECAY: self->decay = data; break;
+  case PORT_SUSTAIN: self->sustain = data; break;
+  case PORT_RELEASE: self->release = data; break;
+  case PORT_RETRIGGER: self->retrigger = data; break;
   }
 }
 
@@ -123,40 +142,48 @@ static void activate(LV2_Handle instance) {
 }
 
 static void handle_midi(struct synth *self, const uint8_t *msg) {
-  fprintf(stderr, "Got midi event, %x %x %x!\n", msg[0], msg[1], msg[2]);
-  switch (lv2_midi_message_type(msg)) {
-  case LV2_MIDI_MSG_NOTE_ON: // fall through
-  case LV2_MIDI_MSG_NOTE_OFF:
-    midi_to_cv_handle_midi(&self->midi_to_cv, msg);
-    break;
-  case LV2_MIDI_MSG_PGM_CHANGE:
-    break;
-  default:
-    break;
-  }
+  midi_to_cv_handle_midi(&self->midi_to_cv, msg);
 }
 
-static double vibrato_tick(struct synth *self) {
-  double sum = 0;
+struct vibrato {
+  double vibrato;
+  double tremolo;
+};
+
+static struct vibrato vibrato_tick(struct synth *self) {
+  double vibrato_sum = 0;
+  double tremolo_sum = 0;
   for(int j = 0; j < NUM_VIBRATOS; j++) {
     if (!self->vibrato_depth[j]) continue;
+    if (!self->tremolo_depth[j]) continue;
     if (!self->vibrato_rate[j]) continue;
-    double depth = *self->vibrato_depth[j];
+    double vibrato_depth = *self->vibrato_depth[j];
+    double tremolo_depth = *self->tremolo_depth[j];
     double rate = *self->vibrato_rate[j] * self->dt;
-    sum += depth * osc_tick_sin(&self->vibrato_lfo[j], rate);
+    double lfo = osc_tick_sin(&self->vibrato_lfo[j], rate);
+    vibrato_sum += vibrato_depth * lfo;
+    tremolo_sum += tremolo_depth * lfo;
   }
-  return sum;
+  return (struct vibrato) {
+    .vibrato = vibrato_sum,
+    .tremolo = tremolo_sum,
+  };
 }
 
 static void run_audio(struct synth *self, uint32_t offset, uint32_t end) {
   if (offset == end) { return; }
   double freq_multiplier = pow(2, *self->octave);
-  double cv_freq = self->midi_to_cv.cv.freq * freq_multiplier * self->dt;
-  double speed = -expm1(-self->dt * *self->speed);
+  struct cv cv = midi_to_cv_get_cv(&self->midi_to_cv);
+  env_handle_cv(&self->env, cv, *self->retrigger > 0);
+  double cv_freq = cv.freq * freq_multiplier * self->dt;
+  double speed = *self->speed;
+  double decay = *self->decay;
+  double sustain = *self->sustain;
+  double release = *self->release;
   int waveform = (int) *self->waveform;
   for (int i = offset; i < end; i++) {
-    double vibrato = vibrato_tick(self);
-    double freq = cv_freq * (1 + vibrato);
+    struct vibrato vibrato = vibrato_tick(self);
+    double freq = cv_freq * (1 + vibrato.vibrato);
     double osc = 0;
     switch (waveform) {
     case 0: osc = osc_tick_saw_box(&self->osc, freq); break;
@@ -206,11 +233,10 @@ static void run_audio(struct synth *self, uint32_t offset, uint32_t end) {
     case 44: osc = osc_tick_triangle_duty(&self->osc, freq, 1.0/12.0); break;
     case 45: osc = osc_tick_triangle_duty(&self->osc, freq, 5.0/12.0); break;
     }
-    self->amp += (self->midi_to_cv.cv.gate - self->amp) * speed;
-    self->out[i] = self->amp * osc;
+    double amp = env_tick(&self->env, self->dt, speed, decay, sustain, release);
+    self->out[i] = amp * (1 + vibrato.tremolo) * osc;
   }
   // TODO add allpass filters
-  // TODO add more waveforms
 }
 
 static bool set_scala_file(struct synth *self, const char *filename) {

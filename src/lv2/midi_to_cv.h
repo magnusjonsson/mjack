@@ -1,8 +1,10 @@
 #include "../tuning/scala.h"
 
 struct midi_to_cv {
-  struct cv cv;
-  uint8_t current_note;
+  uint8_t note;
+  uint8_t velocity;
+  bool trigger;
+  bool retrigger;
   float freq[128];
 };
 
@@ -14,22 +16,22 @@ static void midi_to_cv_init(struct midi_to_cv *self) {
 }
 
 static void midi_to_cv_handle_midi(struct midi_to_cv *self, const uint8_t *msg) {
-  fprintf(stderr, "%s\n", __func__);
   switch (lv2_midi_message_type(msg)) {
   case LV2_MIDI_MSG_NOTE_ON:
-    fprintf(stderr, "Note on %i %i\n", msg[1], msg[2]);
     if (msg[2] != 0) {
-      self->current_note = msg[1];
-      self->cv.freq = self->freq[self->current_note];
-      fprintf(stderr, "%f\n", self->cv.freq);
-      self->cv.gate = msg[2] / 127.0;
+      if (self->velocity == 0) {
+	self->trigger = true;
+      } else {
+	self->retrigger = true;
+      }
+      self->note = msg[1];
+      self->velocity = msg[2];
       break;
     }
     // fall through
   case LV2_MIDI_MSG_NOTE_OFF:
-    fprintf(stderr, "Note off %i %i\n", msg[1], msg[2]);
-    if (msg[1] == self->current_note) {
-      self->cv.gate = 0;
+    if (msg[1] == self->note) {
+      self->velocity = 0;
     }
     break;
   default:
@@ -37,6 +39,17 @@ static void midi_to_cv_handle_midi(struct midi_to_cv *self, const uint8_t *msg) 
   }
 }
 
+static struct cv midi_to_cv_get_cv(struct midi_to_cv *self) {
+  struct cv cv = {
+    .freq = self->freq[self->note],
+    .gate = self->velocity / 127.0,
+    .trigger = self->trigger,
+    .retrigger = self->retrigger,
+  };
+  self->trigger = false;
+  self->retrigger = false;
+  return cv;
+}
 
 static bool midi_to_cv_load_scala_file(struct midi_to_cv *self, const char *filename) {
   fprintf(stderr, "%s\n", __func__);
@@ -45,6 +58,5 @@ static bool midi_to_cv_load_scala_file(struct midi_to_cv *self, const char *file
     fprintf(stderr, "Failed to load scala file %s\n", filename);
     return false;
   }
-  self->cv.freq = self->freq[self->current_note];
   return true;
 }

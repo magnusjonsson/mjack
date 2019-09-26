@@ -30,7 +30,8 @@ struct reverb {
   float* inbufs[NUM_INS];
   float* outbufs[NUM_OUTS];
   float buf[NUM_STAGES][MIX_SIZE][BUF_LEN];
-  float buf_offs[NUM_STAGES][MIX_SIZE];
+  int buf_offs[NUM_STAGES][MIX_SIZE];
+  double z[NUM_STAGES];
   double dt;
   float* tank_buf;
   int tank_len;
@@ -64,11 +65,9 @@ static void init_buf_offs(struct reverb* r) {
 static void init(struct reverb* r, double nframes_per_second) {
   r->dt = 1.0 / nframes_per_second;
   r->tank_len = (int)(nframes_per_second * 1.0);
-  r->tank_buf = calloc(r->tank_len, sizeof(float)); // TODO don't leak
+  r->tank_buf = calloc(r->tank_len, sizeof(float));
   init_buf_offs(r);
 }
-
-static double z[NUM_STAGES];
 
 static void mix4(struct reverb* r, int s, int n, double k, double a) {
   FOR(i, n) {
@@ -77,11 +76,11 @@ static void mix4(struct reverb* r, int s, int n, double k, double a) {
     float t2 = r->buf[s][2][i];
     float t3 = r->buf[s][3][i];
     double T = (t0 + t1 + t2 + t3) * 0.25;
-    z[s] += (T - z[s]) * a;
-    r->buf[s][0][i] = t0 - T - z[s] * k;
-    r->buf[s][1][i] = t1 - T - z[s] * k;
-    r->buf[s][2][i] = t2 - T - z[s] * k;
-    r->buf[s][3][i] = t3 - T - z[s] * k;
+    r->z[s] += (T - r->z[s]) * a;
+    r->buf[s][0][i] = t0 - T - r->z[s] * k;
+    r->buf[s][1][i] = t1 - T - r->z[s] * k;
+    r->buf[s][2][i] = t2 - T - r->z[s] * k;
+    r->buf[s][3][i] = t3 - T - r->z[s] * k;
   }
 }
 

@@ -20,6 +20,7 @@ LV2_LDFLAGS := ${LDFLAGS} -fPIC -shared
 LADSPA_TARGETS := \
 	haas4-ladspa.so \
 	reverb-ladspa.so \
+	reverb2-ladspa.so \
 	apchain-ladspa.so \
 	hpf-ladspa.so \
 	lpf-ladspa.so \
@@ -37,10 +38,12 @@ LADSPA_TARGETS := \
 	knee-ladspa.so \
 	monoroom-ladspa.so \
 	x2-distortion-ladspa.so \
+	slew-ladspa.so \
 
 JACK_GTK_TARGETS := \
 	haas4-jack-gtk \
 	reverb-jack-gtk \
+	reverb2-jack-gtk \
 	sawsynth-jack-gtk \
 	sawsynth2-jack-gtk \
 	sawsynth3-jack-gtk \
@@ -59,6 +62,7 @@ JACK_GTK_TARGETS := \
 	monoroom-jack-gtk \
 	fm-jack-gtk \
 	dc-click-jack-gtk \
+	slew-jack-gtk \
 
 LV2_TARGETS := src/lv2/synth.so validate_lv2
 
@@ -72,6 +76,8 @@ all : clean ${TARGETS}
 
 clean:
 	rm -f ${TARGETS} *.o
+
+install: install-ladspa install-lv2
 
 install-ladspa : ${LADSPA_TARGETS}
 	cp $^ /usr/local/lib/ladspa/
