@@ -1,4 +1,4 @@
-#include "../tuning/scala.h"
+#include "../../tuning/scala.h"
 
 struct midi_to_cv {
   uint8_t note;

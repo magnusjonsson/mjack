@@ -12,8 +12,10 @@
 #include "lv2/lv2plug.in/ns/ext/urid/urid.h"
 #include "lv2/lv2plug.in/ns/lv2core/lv2.h"
 
-#include "lv2utils.h"
-#include "uris.h"
+#define SYNTH_URI "urn:magnusjonsson:mjack:lv2:synth"
+
+#include "../util/lv2utils.h"
+#include "../util/uris.h"
 
 #include "cv.h"
 #include "midi_to_cv.h"
@@ -53,7 +55,7 @@ struct synth {
   LV2_Atom_Forge forge;
   LV2_Atom_Forge_Frame notify_frame;
 
-  struct synth_uris uris;
+  struct uris uris;
   
   const LV2_Atom_Sequence *control;
   const LV2_Atom_Sequence *notify;
@@ -97,7 +99,7 @@ static LV2_Handle instantiate(const LV2_Descriptor *descriptor,
     goto err;
   }
   fprintf(stderr, "Mapping uris\n");
-  synth_uris_init(&self->uris, self->map);
+  uris_init(&self->uris, self->map);
 
   fprintf(stderr, "initializing forge\n");
   lv2_atom_forge_init(&self->forge, self->map);
@@ -378,8 +380,8 @@ static LV2_State_Status restore(LV2_Handle instance,
 
 static const void *extension_data(const char *uri) {
   fprintf(stderr, "extension_data\n");
-  static const LV2_State_Interface state = { save, restore };
   if (!strcmp(uri, LV2_STATE__interface)) {
+    static const LV2_State_Interface state = { save, restore };
     return &state;
   } else {
     fprintf(stderr, "Unknown extension data requested: %s\n", uri);

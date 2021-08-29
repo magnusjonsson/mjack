@@ -1,7 +1,6 @@
-#define SYNTH_URI "urn:magnusjonsson:mjack:lv2:synth"
 #define SCALA_FILE_URI SYNTH_URI "#scala_file"
 
-struct synth_uris {
+struct uris {
   LV2_URID midi_event;
   LV2_URID atom_urid;
   LV2_URID atom_object;
@@ -13,7 +12,7 @@ struct synth_uris {
   LV2_URID scala_file;
 };
 
-static void synth_uris_init(struct synth_uris *uris, LV2_URID_Map *map) {
+static void uris_init(struct uris *uris, LV2_URID_Map *map) {
   uris->midi_event = lv2_map(map, LV2_MIDI__MidiEvent);
   uris->atom_urid = lv2_map(map, LV2_ATOM__URID);
   uris->atom_object = lv2_map(map, LV2_ATOM__Object);
@@ -26,7 +25,7 @@ static void synth_uris_init(struct synth_uris *uris, LV2_URID_Map *map) {
 }
 
 static void write_set_scala_file(LV2_Atom_Forge *forge,
-				 const struct synth_uris *uris,
+				 const struct uris *uris,
 				 const char *filename) {
   LV2_Atom_Forge_Frame frame;
   lv2_atom_forge_object(forge, &frame, 1, uris->patch_set);
@@ -38,7 +37,7 @@ static void write_set_scala_file(LV2_Atom_Forge *forge,
 }
 
 static const char *read_set_scala_file(const LV2_Atom_Object *obj,
-					   const struct synth_uris *uris) {
+				       const struct uris *uris) {
   if (obj->body.otype != uris->patch_set) {
    fprintf(stderr, "body type is not patch set!");
     return NULL;    

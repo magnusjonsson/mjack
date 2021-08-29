@@ -42,7 +42,7 @@ static void update_slider(int cc_number) {
 }
 
 static void save_cc(struct json_object* cc_obj, int cc_number, const char* name) {
-  return json_object_object_add(cc_obj, name, json_object_new_int(instance.wrapper_cc[cc_number]));
+  json_object_object_add(cc_obj, name, json_object_new_int(instance.wrapper_cc[cc_number]));
 }
 
 static void save(char* filename) {

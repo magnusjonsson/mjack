@@ -5,3 +5,18 @@
         a lv2:Plugin ;
         lv2:binary <synth.so> ;
         rdfs:seeAlso <synth.ttl> .
+
+<urn:magnusjonsson:mjack:lv2:synth2>
+        a lv2:Plugin ;
+        lv2:binary <synth2.so> ;
+        rdfs:seeAlso <synth2.ttl> .
+
+<urn:magnusjonsson:mjack:lv2:harmonic_synth>
+        a lv2:Plugin ;
+        lv2:binary <harmonic_synth.so> ;
+        rdfs:seeAlso <harmonic_synth.ttl> .
+
+<urn:magnusjonsson:mjack:lv2:click>
+        a lv2:Plugin ;
+        lv2:binary <click.so> ;
+        rdfs:seeAlso <click.ttl> .

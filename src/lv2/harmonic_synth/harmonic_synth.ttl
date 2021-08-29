@@ -1,0 +1,161 @@
+@prefix atom: <http://lv2plug.in/ns/ext/atom#> .
+@prefix doap:  <http://usefulinc.com/ns/doap#> .
+@prefix lv2:   <http://lv2plug.in/ns/lv2core#> .
+@prefix midi: <http://lv2plug.in/ns/ext/midi#> .
+@prefix patch: <http://lv2plug.in/ns/ext/patch#> .
+@prefix state: <http://lv2plug.in/ns/ext/state#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix units: <http://lv2plug.in/ns/extensions/units#> .
+@prefix urid: <http://lv2plug.in/ns/ext/urid#> .
+
+<urn:magnusjonsson:mjack:lv2:harmonic_synth#scala_file>
+	a lv2:Parameter ;
+	rdfs:label "Scala .scl file" ;
+	rdfs:range atom:Path .
+
+<urn:magnusjonsson:mjack:lv2:harmonic_synth>
+        a lv2:Plugin , lv2:InstrumentPlugin ;
+        doap:name "Harmonic Synth" ;
+        doap:license <https://opensource.org/licenses/GPL-2.0> ;
+        lv2:optionalFeature lv2:hardRTCapable ;
+	lv2:requiredFeature urid:map , urid:unmap ;
+	lv2:extensionData state:interface ;
+   	patch:writable <urn:magnusjonsson:mjack:lv2:harmonic_synth#scala_file> ;
+        lv2:port [
+		 lv2:index 0 ;
+		 lv2:symbol "control" ;
+		 lv2:name "Control" ;
+		 lv2:designation lv2:control ;
+		 a lv2:InputPort ;
+		 a atom:AtomPort ;
+		 atom:bufferType atom:Sequence ;
+		 atom:supports midi:MidiEvent ,
+		 	       patch:Message ;
+	] ;
+        lv2:port [
+		 lv2:index 1 ;
+		 lv2:symbol "notify" ;
+		 lv2:name "Notify" ;
+		 lv2:designation lv2:control ;
+		 a lv2:OutputPort ;
+		 a atom:AtomPort ;
+		 atom:bufferType atom:Sequence ;
+		 atom:supports patch:Message ;
+	] ;
+	lv2:port [
+                lv2:index 2 ;
+	        a lv2:OutputPort , lv2:AudioPort ;
+                lv2:symbol "out" ;
+                lv2:name "Out" ;
+	] ;
+
+lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 3 ;
+		 lv2:symbol "saw_perc" ;
+		 lv2:name "saw_perc" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 1 ;
+		 lv2:default 0 ;
+	] ;
+ 	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 4 ;
+		 lv2:symbol "par_perc" ;
+		 lv2:name "par_perc" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 1 ;
+		 lv2:default 0 ;
+	] ;
+ 	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 5 ;
+		 lv2:symbol "sqr_perc" ;
+		 lv2:name "sqr_perc" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 1 ;
+		 lv2:default 0 ;
+	] ;
+ 	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 6 ;
+		 lv2:symbol "tri_perc" ;
+		 lv2:name "tri_perc" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 1 ;
+		 lv2:default 0 ;
+	] ;
+ 	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 7 ;
+		 lv2:symbol "saw" ;
+		 lv2:name "saw" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 1 ;
+		 lv2:default 0.2 ;
+	] ;
+ 	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 8 ;
+		 lv2:symbol "par" ;
+		 lv2:name "par" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 1 ;
+		 lv2:default 0.2 ;
+	] ;
+ 	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 9 ;
+		 lv2:symbol "sqr" ;
+		 lv2:name "sqr" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 1 ;
+		 lv2:default 0.2 ;
+	] ;
+ 	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 10 ;
+		 lv2:symbol "tri" ;
+		 lv2:name "tri" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 1 ;
+		 lv2:default 0.2 ;
+	] ;
+ 	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 11 ;
+		 lv2:symbol "atk" ;
+		 lv2:name "atk" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 100 ;
+		 lv2:default 0.2 ;
+	] ;
+ 	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 12 ;
+		 lv2:symbol "rls" ;
+		 lv2:name "rls" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 100 ;
+		 lv2:default 0.2 ;
+	] ;
+ 	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 13 ;
+		 lv2:symbol "spd" ;
+		 lv2:name "spd" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 100 ;
+		 lv2:default 5 ;
+	] ;
+ 	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 14 ;
+		 lv2:symbol "dep" ;
+		 lv2:name "dep" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 1 ;
+		 lv2:default 0.01 ;
+	] ;
+ ;
+.

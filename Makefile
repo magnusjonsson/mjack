@@ -64,11 +64,20 @@ JACK_GTK_TARGETS := \
 	dc-click-jack-gtk \
 	slew-jack-gtk \
 
-LV2_TARGETS := src/lv2/synth.so validate_lv2
+LV2_TARGETS := \
+	src/lv2/synth/synth.so \
+	src/lv2/synth2/synth2.so \
+	src/lv2/click/click.so \
+	src/lv2/harmonic_synth/harmonic_synth.so \
+	validate_lv2
 
 LV2_INSTALL_DIR := /usr/lib/lv2/mjack.lv2
 
-TARGETS := ${LV2_TARGETS} ${JACK_GTK_TARGETS} ${LADSPA_TARGETS} ladder-filter-designer
+TARGETS := \
+	${LV2_TARGETS} \
+	${JACK_GTK_TARGETS} \
+	${LADSPA_TARGETS} \
+	ladder-filter-designer
 
 # Toplevel rules
 
@@ -84,7 +93,17 @@ install-ladspa : ${LADSPA_TARGETS}
 
 install-lv2 : ${LV2_TARGETS}
 	mkdir -p ${LV2_INSTALL_DIR}
-	install src/lv2/*.ttl src/lv2/*.so ${LV2_INSTALL_DIR}/
+	install \
+		src/lv2/manifest.ttl \
+		src/lv2/synth/synth.ttl \
+		src/lv2/synth/synth.so \
+		src/lv2/synth2/synth2.ttl \
+		src/lv2/synth2/synth2.so \
+		src/lv2/click/click.ttl \
+		src/lv2/click/click.so \
+		src/lv2/harmonic_synth/harmonic_synth.ttl \
+		src/lv2/harmonic_synth/harmonic_synth.so \
+		${LV2_INSTALL_DIR}/
 
 # Target rules
 
@@ -103,7 +122,16 @@ jack-gtk-wrapper.o : src/wrappers/jack-gtk-wrapper.c
 scala.o : src/tuning/scala.c
 	gcc ${JACK_GTK_CFLAGS} -c $^ -o $@
 
-src/lv2/synth.so : src/lv2/synth.c src/tuning/scala.c
+src/lv2/synth/synth.so : src/lv2/synth/synth.c src/tuning/scala.c
+	gcc ${LV2_CFLAGS} $^ ${LV2_LDFLAGS} -o $@
+
+src/lv2/synth2/synth2.so : src/lv2/synth2/synth2.c src/tuning/scala.c
+	gcc ${LV2_CFLAGS} $^ ${LV2_LDFLAGS} -o $@
+
+src/lv2/click/click.so : src/lv2/click/click.c
+	gcc ${LV2_CFLAGS} $^ ${LV2_LDFLAGS} -o $@
+
+src/lv2/harmonic_synth/harmonic_synth.so : src/lv2/harmonic_synth/harmonic_synth.c src/tuning/scala.c
 	gcc ${LV2_CFLAGS} $^ ${LV2_LDFLAGS} -o $@
 
 # Misc
@@ -115,14 +143,13 @@ dummylash : src/dummylash.c
 	gcc ${LASH_FLAGS} $^ -o $@
 
 validate_lv2:
-	sord_validate -l \
+	echo skipping sord_validate \
 		/usr/lib/lv2/atom.lv2/atom.ttl \
 		/usr/lib/lv2/event.lv2/event.ttl \
 		/usr/lib/lv2/lv2core.lv2/lv2core.ttl \
 		/usr/lib/lv2/midi.lv2/midi.ttl \
 		/usr/lib/lv2/patch.lv2/patch.ttl \
-		/usr/lib/lv2/state.lv2/state.ttl \
 		/usr/lib/lv2/schemas.lv2/*.ttl \
 		/usr/lib/lv2/ui.lv2/ui.ttl \
 		/usr/lib/lv2/urid.lv2/urid.ttl \
-		src/lv2/*.ttl
+		$(find src/lv2 -name '*.ttl')
