@@ -31,9 +31,10 @@
   X(9,sqr)			\
   X(10,tri)			\
   X(11,atk)			\
-  X(12,rls)			\
-  X(13,spd)			\
-  X(14,dep)			\
+  X(12,dcy)			\
+  X(13,rls)			\
+  X(14,spd)			\
+  X(15,dep)			\
 
 enum port {
   port_control         = 0,
@@ -58,7 +59,8 @@ struct voice {
 
   double saw;
   double sqr;
-  
+
+  bool held;
   double gain;
 
   double perc;
@@ -74,6 +76,7 @@ static void voice_init(struct voice *v, double freq) {
   v->saw = 0;
   v->sqr = -0.5;
 
+  v->held = false;
   v->perc = 0;
   v->gain = 0;
 
@@ -97,12 +100,16 @@ static double voice_tick(struct voice *v, struct params const *p, double dt) {
   double sqr = v->sqr;
   double tri = 2 * saw * sqr;
 
-  double tgt = v->gain + 1e-20;
-  double spd = v->gain > 0 ? *p->atk : *p->rls;
-  double k = fmin(0.5, spd * dt);
+  double atk = *p->atk;
+  double dcy = *p->dcy;
+  double rls = *p->rls;
 
-  v->perc += (1e-20 - v->perc) * k;
-  v->env += (tgt - v->env) * k;
+  v->gain += (1e-20 - v->gain) * fmin(0.5, dcy * dt);
+  
+  double spd = v->held ? atk : rls;
+
+  v->perc += (1e-20 - v->perc) * fmin(0.5, atk * dt);
+  v->env += (v->gain - v->env) * fmin(0.5, spd * dt);
 
   double out_env = 0;
   out_env += *p->saw * saw;
@@ -118,6 +125,7 @@ static double voice_tick(struct voice *v, struct params const *p, double dt) {
 }
 
 static void voice_handle_note_on(struct voice *v, int velo) {
+  v->held = true;
   v->gain = 1.0 / 128.0 * velo;
   fprintf(stderr, "v->perc before %lf\n", v->perc);
   v->perc += 1.0 / 128.0 * velo;
@@ -125,6 +133,7 @@ static void voice_handle_note_on(struct voice *v, int velo) {
 }
 
 static void voice_handle_note_off(struct voice *v) {
+  v->held = false;
   v->gain = 0;
 }
 

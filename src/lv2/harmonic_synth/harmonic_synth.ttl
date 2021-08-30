@@ -133,6 +133,15 @@ lv2:port [
  	lv2:port [
 		 a lv2:InputPort , lv2:ControlPort ;
 		 lv2:index 12 ;
+		 lv2:symbol "dcy" ;
+		 lv2:name "dcy" ;
+		 lv2:minimum 0 ;
+		 lv2:maximum 100 ;
+		 lv2:default 0.2 ;
+	] ;
+ 	lv2:port [
+		 a lv2:InputPort , lv2:ControlPort ;
+		 lv2:index 13 ;
 		 lv2:symbol "rls" ;
 		 lv2:name "rls" ;
 		 lv2:minimum 0 ;
@@ -141,7 +150,7 @@ lv2:port [
 	] ;
  	lv2:port [
 		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 13 ;
+		 lv2:index 14 ;
 		 lv2:symbol "spd" ;
 		 lv2:name "spd" ;
 		 lv2:minimum 0 ;
@@ -150,7 +159,7 @@ lv2:port [
 	] ;
  	lv2:port [
 		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 14 ;
+		 lv2:index 15 ;
 		 lv2:symbol "dep" ;
 		 lv2:name "dep" ;
 		 lv2:minimum 0 ;
