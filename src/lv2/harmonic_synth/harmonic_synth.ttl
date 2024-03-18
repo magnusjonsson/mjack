@@ -7,6 +7,7 @@
 @prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix units: <http://lv2plug.in/ns/extensions/units#> .
 @prefix urid: <http://lv2plug.in/ns/ext/urid#> .
+@prefix pg: <http://lv2plug.in/ns/ext/port-groups#> .
 
 <urn:magnusjonsson:mjack:lv2:harmonic_synth#scala_file>
 	a lv2:Parameter ;
@@ -45,126 +46,44 @@
 	lv2:port [
                 lv2:index 2 ;
 	        a lv2:OutputPort , lv2:AudioPort ;
-                lv2:symbol "out" ;
-                lv2:name "Out" ;
+                lv2:symbol "out_left" ;
+                lv2:name "Out Left" ;
+		pg:designation pg:left;
+	] ;
+	lv2:port [
+                lv2:index 3 ;
+	        a lv2:OutputPort , lv2:AudioPort ;
+                lv2:symbol "out_right" ;
+                lv2:name "OutRight" ;
+		pg:designation pg:right;
 	] ;
 
-lv2:port [
-		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 3 ;
-		 lv2:symbol "saw_perc" ;
-		 lv2:name "saw_perc" ;
-		 lv2:minimum 0 ;
-		 lv2:maximum 1 ;
-		 lv2:default 0 ;
-	] ;
- 	lv2:port [
-		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 4 ;
-		 lv2:symbol "par_perc" ;
-		 lv2:name "par_perc" ;
-		 lv2:minimum 0 ;
-		 lv2:maximum 1 ;
-		 lv2:default 0 ;
-	] ;
- 	lv2:port [
-		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 5 ;
-		 lv2:symbol "sqr_perc" ;
-		 lv2:name "sqr_perc" ;
-		 lv2:minimum 0 ;
-		 lv2:maximum 1 ;
-		 lv2:default 0 ;
-	] ;
- 	lv2:port [
-		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 6 ;
-		 lv2:symbol "tri_perc" ;
-		 lv2:name "tri_perc" ;
-		 lv2:minimum 0 ;
-		 lv2:maximum 1 ;
-		 lv2:default 0 ;
-	] ;
- 	lv2:port [
-		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 7 ;
-		 lv2:symbol "saw" ;
-		 lv2:name "saw" ;
-		 lv2:minimum 0 ;
-		 lv2:maximum 1 ;
-		 lv2:default 0.2 ;
-	] ;
- 	lv2:port [
-		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 8 ;
-		 lv2:symbol "par" ;
-		 lv2:name "par" ;
-		 lv2:minimum 0 ;
-		 lv2:maximum 1 ;
-		 lv2:default 0.2 ;
-	] ;
- 	lv2:port [
-		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 9 ;
-		 lv2:symbol "sqr" ;
-		 lv2:name "sqr" ;
-		 lv2:minimum 0 ;
-		 lv2:maximum 1 ;
-		 lv2:default 0.2 ;
-	] ;
- 	lv2:port [
-		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 10 ;
-		 lv2:symbol "tri" ;
-		 lv2:name "tri" ;
-		 lv2:minimum 0 ;
-		 lv2:maximum 1 ;
-		 lv2:default 0.2 ;
-	] ;
- 	lv2:port [
-		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 11 ;
-		 lv2:symbol "atk" ;
-		 lv2:name "atk" ;
-		 lv2:minimum 0 ;
-		 lv2:maximum 100 ;
-		 lv2:default 0.2 ;
-	] ;
- 	lv2:port [
-		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 12 ;
-		 lv2:symbol "dcy" ;
-		 lv2:name "dcy" ;
-		 lv2:minimum 0 ;
-		 lv2:maximum 100 ;
-		 lv2:default 0.2 ;
-	] ;
- 	lv2:port [
-		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 13 ;
-		 lv2:symbol "rls" ;
-		 lv2:name "rls" ;
-		 lv2:minimum 0 ;
-		 lv2:maximum 100 ;
-		 lv2:default 0.2 ;
-	] ;
- 	lv2:port [
-		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 14 ;
-		 lv2:symbol "spd" ;
-		 lv2:name "spd" ;
-		 lv2:minimum 0 ;
-		 lv2:maximum 100 ;
-		 lv2:default 5 ;
-	] ;
- 	lv2:port [
-		 a lv2:InputPort , lv2:ControlPort ;
-		 lv2:index 15 ;
-		 lv2:symbol "dep" ;
-		 lv2:name "dep" ;
-		 lv2:minimum 0 ;
-		 lv2:maximum 1 ;
-		 lv2:default 0.01 ;
-	] ;
- ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 4  ; lv2:symbol "atk"       ; lv2:name "atk"       ; lv2:minimum 0    ; lv2:maximum 1   ; lv2:default 0.5  ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 5  ; lv2:symbol "dcy"       ; lv2:name "dcy"       ; lv2:minimum 0    ; lv2:maximum 1   ; lv2:default 0.05 ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 6  ; lv2:symbol "sus"       ; lv2:name "sus"       ; lv2:minimum 0    ; lv2:maximum 1   ; lv2:default 0 ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 7  ; lv2:symbol "rls"       ; lv2:name "rls"       ; lv2:minimum 0    ; lv2:maximum 1   ; lv2:default 0.2  ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 8  ; lv2:symbol "tune1"      ; lv2:name "tune1"      ; lv2:minimum 0    ; lv2:maximum 8   ; lv2:default 1    ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 9  ; lv2:symbol "tune2"      ; lv2:name "tune2"      ; lv2:minimum 0    ; lv2:maximum 8   ; lv2:default 1    ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 10  ; lv2:symbol "tune3"      ; lv2:name "tune3"      ; lv2:minimum 0    ; lv2:maximum 8   ; lv2:default 1    ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 11 ; lv2:symbol "tune4"      ; lv2:name "tune4"      ; lv2:minimum 0    ; lv2:maximum 8   ; lv2:default 1    ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 12 ; lv2:symbol "fine1"      ; lv2:name "fine1"      ; lv2:minimum -0.05    ; lv2:maximum 0.05   ; lv2:default 0    ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 13 ; lv2:symbol "fine2"      ; lv2:name "fine2"      ; lv2:minimum -0.05    ; lv2:maximum 0.05   ; lv2:default 0    ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 14 ; lv2:symbol "fine3"      ; lv2:name "fine3"      ; lv2:minimum -0.05    ; lv2:maximum 0.05   ; lv2:default 0    ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 15 ; lv2:symbol "fine4"      ; lv2:name "fine4"      ; lv2:minimum -0.05    ; lv2:maximum 0.05   ; lv2:default 0    ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 16 ; lv2:symbol "gain1"      ; lv2:name "gain1"      ; lv2:minimum 0    ; lv2:maximum 8   ; lv2:default 0    ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 17 ; lv2:symbol "gain2"      ; lv2:name "gain2"      ; lv2:minimum 0    ; lv2:maximum 8   ; lv2:default 0    ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 18 ; lv2:symbol "gain3"      ; lv2:name "gain3"      ; lv2:minimum 0    ; lv2:maximum 8   ; lv2:default 0    ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 19 ; lv2:symbol "gain4"      ; lv2:name "gain4"      ; lv2:minimum 0    ; lv2:maximum 8   ; lv2:default 0    ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 20 ; lv2:symbol "glide_lin" ; lv2:name "glide_lin" ; lv2:minimum 0    ; lv2:maximum 1 ; lv2:default 1 ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 21 ; lv2:symbol "glide_exp" ; lv2:name "glide_exp" ; lv2:minimum 0    ; lv2:maximum 1 ; lv2:default 1 ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 22 ; lv2:symbol "spd"       ; lv2:name "spd"       ; lv2:minimum 0    ; lv2:maximum 1   ; lv2:default 0    ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 23 ; lv2:symbol "spd2"       ; lv2:name "spd2"       ; lv2:minimum 0    ; lv2:maximum 1   ; lv2:default 0    ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 24 ; lv2:symbol "dep"       ; lv2:name "dep"       ; lv2:minimum 0    ; lv2:maximum 1   ; lv2:default 0 ; ] ;
+ 	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 25 ; lv2:symbol "dep2"       ; lv2:name "dep2"       ; lv2:minimum 0    ; lv2:maximum 1   ; lv2:default 0 ; ] ;
+	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 26 ; lv2:symbol "lpf"       ; lv2:name "lpf"   ; lv2:minimum 0.001   ; lv2:maximum 1   ; lv2:default 0.05    ; ] ;
+	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 27 ; lv2:symbol "lpf_trk"       ; lv2:name "lpf_trk"   ; lv2:minimum 0   ; lv2:maximum 1   ; lv2:default 0    ; ] ;
+	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 28 ; lv2:symbol "lpf_env"       ; lv2:name "lpf_env"   ; lv2:minimum 0   ; lv2:maximum 1   ; lv2:default 1    ; ] ;
+	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 29 ; lv2:symbol "res"       ; lv2:name "res"   ; lv2:minimum 0   ; lv2:maximum 1   ; lv2:default 0.5    ; ] ;
+	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 30 ; lv2:symbol "amp_env"       ; lv2:name "amp_env"   ; lv2:minimum 0   ; lv2:maximum 1   ; lv2:default 1    ; ] ;
+	lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 31 ; lv2:symbol "waveform"       ; lv2:name "waveform"   ; lv2:minimum 0   ; lv2:maximum 4.99   ; lv2:default 0    ; ] ;
 .

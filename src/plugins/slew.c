@@ -26,13 +26,17 @@ struct filter {
   float *out;
 };
 
+static float slew(float x) {
+  return x / sqrtf(1.0f + x * x);
+}
+
 void plugin_process(struct instance* instance, int nframes) {
   struct filter *h = instance->plugin;
   float rate = h->dt * 10 * pow(40000 / 10.0, (instance->wrapper_cc[CC_SLEWRATE])/127.0);
   float k1 = 1 / rate;
   float k2 = rate;
   FOR(i, nframes) {
-    h->out[i] = h->x += k2 * tanh(k1 * (h->in[i] - h->x));
+    h->out[i] = h->x += k2 * slew(k1 * (h->in[i] - h->x));
   }
 }
 

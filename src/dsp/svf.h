@@ -46,7 +46,6 @@ static inline double svf_tick(struct svf* state, double dt, double freq, double 
 }
 
 static inline double svf_shape(double x) {
-  x += 0.25;
   return fabs(x) < 1e-12 ? 1.0 : tanh(x) / x;
 }
 

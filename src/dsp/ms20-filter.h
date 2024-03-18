@@ -8,7 +8,7 @@ struct ms20_filter {
 
 // arbitrarily made up, asymmetric to introduce even harmonics
 static inline double ms20_filter_shape_gain(double x) {
-  return 1 / sqrt(1.0 + 0.66 * x + x * x);
+  return 1 / sqrt(1.0 + x * x);
 }
 
 static inline double ms20_filter_shape(double clip_level, double x) {

@@ -18,118 +18,270 @@
 #include "../util/uris.h"
 #include "../../tuning/scala.h"
 
-#define NUM_VOICES 128
 #define FOR(i, n) for(int i = 0; i < n; i++)
 
+#define ANTIALIAS_NUM_POLES 2
+#define NUM_OSC 4
+#define NUM_LFO 2
+
 #define PARAMS			\
-  X(3,saw_perc)			\
-  X(4,par_perc)			\
-  X(5,sqr_perc)			\
-  X(6,tri_perc)			\
-  X(7,saw)			\
-  X(8,par)			\
-  X(9,sqr)			\
-  X(10,tri)			\
-  X(11,atk)			\
-  X(12,dcy)			\
-  X(13,rls)			\
-  X(14,spd)			\
-  X(15,dep)			\
+  X(atk)			\
+  X(dcy)			\
+  X(sus)			\
+  X(rls)			\
+  X(tune1)			\
+  X(tune2)			\
+  X(tune3)			\
+  X(tune4)			\
+  X(fine1)			\
+  X(fine2)			\
+  X(fine3)			\
+  X(fine4)			\
+  X(gain1)			\
+  X(gain2)			\
+  X(gain3)			\
+  X(gain4)			\
+  X(glide_lin)			\
+  X(glide_exp)			\
+  X(spd)			\
+  X(spd2)			\
+  X(dep)			\
+  X(dep2)			\
+  X(lpf)                        \
+  X(lpf_trk)                    \
+  X(lpf_env)                    \
+  X(res)                        \
+  X(amp_env)                    \
+  X(waveform)                   \
 
 enum port {
   port_control         = 0,
   port_notify          = 1,
-  port_out             = 2,
-#define X(i, name) port_##name = i,
+  port_out_left        = 2,
+  port_out_right       = 3,
+#define X(name) port_##name,
   PARAMS
 #undef X
 };
 
 struct params {
-#define X(i, name) float const *name;
+#define X(name) float const *name;
   PARAMS
 #undef X
 };
 
 struct voice {
-  double lfosaw;
-  double lfosqr;
+  double lfosaw[NUM_LFO];
+  double lfosqr[NUM_LFO];
 
+  double saw[NUM_OSC];
+
+  double target_freq;
   double freq;
 
-  double saw;
-  double sqr;
+  //double antialias[2][ANTIALIAS_NUM_POLES];
 
   bool held;
   double gain;
 
-  double perc;
-  double env;
+  double body_dcy;
+  double body_atk;
 };
 
-static void voice_init(struct voice *v, double freq) {
-  v->lfosaw = 0;
-  v->lfosqr = -0.5;
+static void voice_init(struct voice *v) {
+  FOR(i, NUM_LFO) {
+    v->lfosaw[i] = 0;
+  }
 
-  v->freq = freq;
+  v->target_freq = 220;
+  v->freq = 220;
 
-  v->saw = 0;
-  v->sqr = -0.5;
+  FOR(i, NUM_OSC) {
+    v->saw[i] = 0;
+  }
+  FOR(i, NUM_LFO) {
+    v->lfosqr[i] = 1;
+  }
 
   v->held = false;
-  v->perc = 0;
-  v->gain = 0;
 
-  v->perc = 0;
-  v->env = 0;
+  v->body_dcy = 0;
+  v->body_atk = 0;
 }
 
-static double voice_tick(struct voice *v, struct params const *p, double dt) {
-  double lforate = dt * *p->spd;
-  v->lfosaw += lforate;
-  while(v->lfosaw > 0.5) { v->lfosaw -= 1.0; v->lfosqr =-v->lfosqr; }
-  double lfosaw = v->lfosaw;
-  double lfosqr = v->lfosqr;
-  double lfotri = 2 * lfosaw * lfosqr;
-  
-  double rate = dt * (v->freq * (1.0 + *p->dep * lfotri));
-  v->saw += rate;
-  while(v->saw > 0.5) { v->saw -= 1.0; v->sqr = -v->sqr; }
-  double saw = v->saw;
-  double par = 4 * saw * saw - (1.0 / 3.0);
-  double sqr = v->sqr;
-  double tri = 2 * saw * sqr;
-
-  double atk = *p->atk;
-  double dcy = *p->dcy;
-  double rls = *p->rls;
-
-  v->gain += (1e-20 - v->gain) * fmin(0.5, dcy * dt);
-  
-  double spd = v->held ? atk : rls;
-
-  v->perc += (1e-20 - v->perc) * fmin(0.5, atk * dt);
-  v->env += (v->gain - v->env) * fmin(0.5, spd * dt);
-
-  double out_env = 0;
-  out_env += *p->saw * saw;
-  out_env += *p->par * par;
-  out_env += *p->sqr * sqr;
-  out_env += *p->tri * tri;
-  double out_perc = 0;
-  out_perc += *p->saw_perc * saw;
-  out_perc += *p->par_perc * par;
-  out_perc += *p->sqr_perc * sqr;
-  out_perc += *p->tri_perc * tri;
-  return 0.15 * (out_env * v->env + out_perc * v->perc);
+static double square(double x) {
+  return x * x;
 }
 
-static void voice_handle_note_on(struct voice *v, int velo) {
+static double cube(double x) {
+  return x * x * x;
+}
+
+static double rate_shape(double param) {
+  return 10000 * square(param);
+}
+
+static void voice_tick(struct voice *v, struct params const *p, double dt, float *out_left, float *out_right) {
+  // ENV
+
+  if (v->held) {
+    v->body_dcy += (square(*p->sus) - v->body_dcy) * fmin(0.5, dt * rate_shape(*p->dcy));
+  } else {
+    v->body_dcy += (1e-20           - v->body_dcy) * fmin(0.5, dt * rate_shape(*p->rls));
+  }
+  v->body_atk += (v->body_dcy - v->body_atk) * fmin(0.5, dt * rate_shape(*p->atk));
+
+  double body_env = v->body_atk;
+
+  // LFO
+
+
+  double spd[NUM_LFO] = {
+    square(*p->spd),
+    square(*p->spd2),
+  };
+  double dep[NUM_LFO] = {
+    square(*p->dep),
+    square(*p->dep2),
+  };
+  double lfo[NUM_LFO];
+  FOR(i, NUM_LFO) {
+    double lforate = dt * spd[i] * 100;
+    v->lfosaw[i] += lforate;
+    while(v->lfosaw[i] <= -0.5) { v->lfosaw[i] += 1.0; v->lfosqr[i] = -v->lfosqr[i]; }
+    while(v->lfosaw[i] > 0.5) { v->lfosaw[i] -= 1.0; v->lfosqr[i] = -v->lfosqr[i]; }
+    double lfotri = 2 * v->lfosaw[i] * v->lfosqr[i];
+    lfo[i] = lfotri;
+  };
+
+  // OSC
+
+  double tune[NUM_OSC] = {
+    *p->tune1,
+    *p->tune2,
+    *p->tune3,
+    *p->tune4,
+  };
+  double fine[NUM_OSC] = {
+    *p->fine1,
+    *p->fine2,
+    *p->fine3,
+    *p->fine4,
+  };
+  double gain[NUM_OSC] = {
+    *p->gain1,
+    *p->gain2,
+    *p->gain3,
+    *p->gain4,
+  };
+
+  double r_mod = 1.0;
+  FOR(i, NUM_LFO) {
+    r_mod += dep[i] * lfo[i];
+  }
+
+  v->freq += (v->target_freq - v->freq) * fmin(0.5, dt * (rate_shape(*p->glide_lin) + square(*p->glide_exp) * v->freq));
+
+  double freq = fmax(1e-6, v->freq * r_mod);
+
+  // Gains
+
+  double rate[NUM_OSC];
+  FOR(i, NUM_OSC) {
+    rate[i] = freq * fmax(1e-6, tune[i] * (1 + fine[i]));
+  }
+  double w = dt * 100000 * cube(*p->lpf) * pow(freq/220, *p->lpf_trk) * pow(2*body_env, *p->lpf_env);
+
+  double g_overall = pow(2*body_env, *p->amp_env);
+  
+  double sum = 0;
+
+  FOR(i, NUM_OSC) {
+    double travel = dt * rate[i];
+    double phase = v->saw[i];
+    phase += travel;
+    while(phase >= 1) {
+      phase -= 1.0;
+    }
+    v->saw[i] = phase;
+    double g = gain[i] * g_overall;
+
+    switch ((int) *p->waveform) {
+    case 0: // saw
+      {
+	double c = cos(phase*2*3.141592) * exp(-16*travel/w);
+	double s = sin(phase*2*3.141592) * exp(-16*travel/w);
+	sum += atan(s/(1+c)) * g;
+      }
+      break;
+    case 1: // square 1
+      {
+	double s = sin(phase*2*3.141592) * 0.1 * w / travel;
+	sum += s / sqrt(1 + s * s) * g;
+      }
+      break;
+    case 2: // square 2
+      {
+	double s = sin(phase*2*3.141592);
+	sum += atan(s * 0.1 * w / travel) * g;
+      }
+      break;
+    case 3: // "square" impulse train with filter
+      {
+	double k_abs = -2*3.141592 * fmax(1e-6, w/travel);
+	double k_cos = cos(0.5*3.141592 * fmax(0.005, fmin(0.99, *p->res)));
+	double k_sin = sin(0.5*3.141592 * fmax(0.005, fmin(0.99, *p->res)));
+	double k_re = k_abs * k_cos;
+	double k_im = k_abs * k_sin;
+	double p2 = phase + 0.5;
+	if (p2 >= 1) {
+	  p2 -= 1;
+	}
+	double a = exp(phase * k_re) * cos(phase * k_im) - exp(p2 * k_re) * cos(p2 * k_im);
+	double b = exp(phase * k_re) * sin(phase * k_im) - exp(p2 * k_re) * sin(p2 * k_im);
+	double A = exp(k_re) * cos(k_im);
+	double B = exp(k_re) * sin(k_im);
+
+	//a / (1 - A) - (A - 1)/k / (1 - A) = -1/k
+	
+	sum += (a * B + b*(1-A)) / ((1-A)*(1-A) + B*B) * g * k_cos;
+      }
+      break;
+    case 4: // "saw" impulse train with filter
+      {
+	double k_abs = -2*3.141592 * fmax(1e-6, w/travel);
+	double k_cos = cos(0.5*3.141592 * fmax(0.005, fmin(0.99, *p->res)));
+	double k_sin = sin(0.5*3.141592 * fmax(0.005, fmin(0.99, *p->res)));
+	double k_re = k_abs * k_cos;
+	double k_im = k_abs * k_sin;
+	double a = exp(phase * k_re) * cos(phase * k_im);
+	double b = exp(phase * k_re) * sin(phase * k_im);
+	double A = exp(k_re) * cos(k_im);
+	double B = exp(k_re) * sin(k_im);
+
+	//a / (1 - A) - (A - 1)/k / (1 - A) = -1/k
+
+	double bias_im = k_im / (k_re * k_re + k_im * k_im);
+	double pole_im = (a * B + b*(1-A)) / ((1-A)*(1-A) + B*B);
+
+	sum += (pole_im - bias_im) * g * k_cos;
+      }
+      break;
+    }
+  }
+  *out_left  = sum;
+  *out_right = sum;
+}
+
+static void voice_handle_note_on(struct voice *v, float freq, int velo) {
+  fprintf(stderr, "note on! target_freq: %f  freq: %f\n", freq, v->freq);
+  v->target_freq = freq;
   v->held = true;
-  v->gain = 1.0 / 128.0 * velo;
-  fprintf(stderr, "v->perc before %lf\n", v->perc);
-  v->perc += 1.0 / 128.0 * velo;
-  fprintf(stderr, "v->perc after %lf\n", v->perc);
+  v->body_dcy = 1.0 / 128.0 * velo;
+  FOR(i, NUM_LFO) {
+    fprintf(stderr, "lfosaw[%i]=%f\n", i, v->lfosaw[i]);
+    fprintf(stderr, "lfosqr[%i]=%f\n", i, v->lfosqr[i]);
+  }
 }
 
 static void voice_handle_note_off(struct voice *v) {
@@ -151,11 +303,14 @@ struct synth {
 
   const LV2_Atom_Sequence *control;
   const LV2_Atom_Sequence *notify;
-  float *out;
+  float *out[2];
 
   struct params params;
 
-  struct voice voice[128];
+  int current_note;
+  float freq[128];
+
+  struct voice voice;
 };
 
 static LV2_Handle instantiate(const LV2_Descriptor *descriptor,
@@ -187,13 +342,14 @@ static LV2_Handle instantiate(const LV2_Descriptor *descriptor,
     lv2_atom_forge_init(&self->forge, self->map);
   }
 
-  fprintf(stderr, "Initializing voices\n");
+  fprintf(stderr, "Initializing frequency table\n");
   {
     for (int i = 0; i < 128; i++) {
-      double freq = 440.0 * pow(2.0, (i - 60.0) / 12.0);
-      voice_init(&self->voice[i], freq);
+      self->freq[i] = 440.0 * pow(2.0, (i - 60.0) / 12.0);
     }
   }
+  fprintf(stderr, "Initializing voice\n");
+  voice_init(&self->voice);
 
   fprintf(stderr, "Done\n");
   return self;
@@ -208,8 +364,9 @@ static void connect_port(LV2_Handle instance, uint32_t port, void *data) {
   switch (port) {
   case port_control: self->control = data; break;
   case port_notify: self->notify = data; break;
-  case port_out: self->out = data; break;
-#define X(i, name) case port_##name: self->params.name = data; break;
+  case port_out_left: self->out[0] = data; break;
+  case port_out_right: self->out[1] = data; break;
+#define X(name) case port_##name: self->params.name = data; break;
     PARAMS
 #undef X
   }
@@ -220,11 +377,14 @@ static void activate(LV2_Handle instance) {
 }
 
 static void handle_note_on(struct synth *self, int note, int velocity) {
-  voice_handle_note_on(&self->voice[note], velocity);
+  self->current_note = note;
+  voice_handle_note_on(&self->voice, self->freq[note], velocity);
 }
 
 static void handle_note_off(struct synth *self, int note) {
-  voice_handle_note_off(&self->voice[note]);
+  if (note == self->current_note) {
+    voice_handle_note_off(&self->voice);
+  }
 }
 
 static void handle_midi(struct synth *self, const uint8_t *msg) {
@@ -243,16 +403,15 @@ static void handle_midi(struct synth *self, const uint8_t *msg) {
 
 static void run_audio(struct synth *self, uint32_t offset, uint32_t end) {
   if (offset == end) { return; }
-  for (int v = 0; v < NUM_VOICES; v++) {
-    for (int i = offset; i < end; i++) {
-      self->out[i] += voice_tick(&self->voice[v], &self->params, self->dt);
-    }
+  for (int i = offset; i < end; i++) {
+    voice_tick(&self->voice, &self->params, self->dt, &self->out[0][i], &self->out[1][i]);
   }
 }
 
 static bool set_scala_file(struct synth *self, const char *filename) {
   if (strlen(filename) < PATH_MAX) {
-    strncpy(self->scala_file, filename, PATH_MAX);
+    strncpy(self->scala_file, filename, PATH_MAX-1);
+    self->scala_file[PATH_MAX-1] = '\0';
     // TODO do this in worker thread
     float cents[128];
     float freq[128];
@@ -261,7 +420,7 @@ static bool set_scala_file(struct synth *self, const char *filename) {
       return false;
     }
     for (int i = 0; i < 128; i++) {
-      self->voice[i].freq = freq[i];
+      self->freq[i] = freq[i];
     }
     return true;
   } else {

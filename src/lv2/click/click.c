@@ -43,13 +43,8 @@ static void voice_init(struct voice *v) {
 }
 
 static double voice_tick(struct voice *v, struct params const *p, double dt) {
-  // d/dt I  = s / sqrt(1.0 + k * s * s * t)
-  // I = 2 * s * sqrt(1.0 + k * s * s * t) / (k * s * s)
-  double s = v->state;
-  double k = 40000.0 * dt;
-  double f = sqrt(1.0 + k * s * s);
-  v->state = s / f;
-  //return 0.5 * (f - 1) / (k * s);
+  double k = fmin(0.5, 10.0 * dt * v->state * v->state);
+  v->state -= k * v->state;
   return v->state;
   
 }

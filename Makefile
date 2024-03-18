@@ -1,6 +1,6 @@
 # Flags
 
-CFLAGS := -Wall -O2 -ftree-vectorize -ffast-math -Xlinker -no-undefined -std=gnu99 -fvisibility=hidden
+CFLAGS := -Wall -Wshadow -O2 -ftree-vectorize -ffast-math -Xlinker -no-undefined -std=gnu99 -fvisibility=hidden
 LDFLAGS := -lm
 
 JACK_GTK_CFLAGS := ${CFLAGS} $(shell pkg-config --cflags gtk+-2.0 json-c jack)
@@ -69,7 +69,6 @@ LV2_TARGETS := \
 	src/lv2/synth2/synth2.so \
 	src/lv2/click/click.so \
 	src/lv2/harmonic_synth/harmonic_synth.so \
-	validate_lv2
 
 LV2_INSTALL_DIR := /usr/lib/lv2/mjack.lv2
 
@@ -132,7 +131,7 @@ src/lv2/click/click.so : src/lv2/click/click.c
 	gcc ${LV2_CFLAGS} $^ ${LV2_LDFLAGS} -o $@
 
 src/lv2/harmonic_synth/harmonic_synth.so : src/lv2/harmonic_synth/harmonic_synth.c src/tuning/scala.c
-	gcc ${LV2_CFLAGS} $^ ${LV2_LDFLAGS} -o $@
+	gcc -g ${LV2_CFLAGS} $^ ${LV2_LDFLAGS} -o $@
 
 # Misc
 
@@ -143,7 +142,7 @@ dummylash : src/dummylash.c
 	gcc ${LASH_FLAGS} $^ -o $@
 
 validate_lv2:
-	echo skipping sord_validate \
+	sord_validate \
 		/usr/lib/lv2/atom.lv2/atom.ttl \
 		/usr/lib/lv2/event.lv2/event.ttl \
 		/usr/lib/lv2/lv2core.lv2/lv2core.ttl \

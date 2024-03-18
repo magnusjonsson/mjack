@@ -1,8 +1,4 @@
 #include <stdio.h>
-
-
-
-
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -22,6 +18,7 @@ const unsigned plugin_ladspa_unique_id = 21;
 
 #define CC_SIZE 127
 #define CC_GAIN 100
+#define CC_DIFF 104
 
 #define BUF_LEN 32
 
@@ -87,8 +84,10 @@ void plugin_process(struct instance* instance, int nframes) {
   struct reverb *r = instance->plugin;
   float size_seconds = square((1 + instance->wrapper_cc[CC_SIZE]) / 128.0) * MAX_SIZE_SECONDS;
   float gain[NUM_STAGES];
+  float diff[NUM_STAGES];
   FOR(i, NUM_STAGES) {
     gain[i] = square(instance->wrapper_cc[CC_GAIN + i] / 127.0);
+    diff[i] = 0.5 * (instance->wrapper_cc[CC_DIFF + i] / 127.0);
   }
   int io_base = 0;
   init_buf_offs(r, size_seconds);
@@ -133,7 +132,7 @@ void plugin_process(struct instance* instance, int nframes) {
 	  float t1 = r->buf[o][s][1][i];
 	  float t2 = r->buf[o][s][2][i];
 	  float t3 = r->buf[o][s][3][i];
-	  float T = (t0 + t1 + t2 + t3) * 0.5;
+	  float T = (t0 + t1 + t2 + t3) * diff[s];
 	  r->buf[o][s][0][i] = t0 - T;
 	  r->buf[o][s][1][i] = t1 - T;
 	  r->buf[o][s][2][i] = t2 - T;
@@ -184,14 +183,19 @@ void plugin_init(struct instance* instance, double sample_rate) {
   static char outname[NUM_OUTS][MAX_NAME_LENGTH];
   static char gainname1[NUM_STAGES][MAX_NAME_LENGTH];
   static char gainname2[NUM_STAGES][MAX_NAME_LENGTH];
+  static char diffname1[NUM_STAGES][MAX_NAME_LENGTH];
+  static char diffname2[NUM_STAGES][MAX_NAME_LENGTH];
   FOR(i, NUM_OUTS) snprintf(inname[i], MAX_NAME_LENGTH, "in %i", i);
   FOR(i, NUM_OUTS) snprintf(outname[i], MAX_NAME_LENGTH, "out %i", i);
   FOR(i, NUM_STAGES) snprintf(gainname1[i], MAX_NAME_LENGTH, "Gain %i", i);
   FOR(i, NUM_STAGES) snprintf(gainname2[i], MAX_NAME_LENGTH, "gain %i", i);
+  FOR(i, NUM_STAGES) snprintf(diffname1[i], MAX_NAME_LENGTH, "Diff %i", i);
+  FOR(i, NUM_STAGES) snprintf(diffname2[i], MAX_NAME_LENGTH, "diff %i", i);
   FOR(i, NUM_OUTS) wrapper_add_audio_input(instance, inname[i], &r->inbufs[i]);
   FOR(i, NUM_OUTS) wrapper_add_audio_output(instance, outname[i], &r->outbufs[i]);
   wrapper_add_cc(instance, CC_SIZE, "Size", "size", 64);
   FOR(i, NUM_STAGES) wrapper_add_cc(instance, CC_GAIN+i, gainname1[i], gainname2[i], 0);
+  FOR(i, NUM_STAGES) wrapper_add_cc(instance, CC_DIFF+i, diffname1[i], diffname2[i], 0);
 }
 
 void plugin_destroy(struct instance* instance) {

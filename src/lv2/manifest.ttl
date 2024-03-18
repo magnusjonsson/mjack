@@ -11,6 +11,11 @@
         lv2:binary <synth2.so> ;
         rdfs:seeAlso <synth2.ttl> .
 
+<urn:magnusjonsson:mjack:lv2:synth3>
+        a lv2:Plugin ;
+        lv2:binary <synth3.so> ;
+        rdfs:seeAlso <synth3.ttl> .
+
 <urn:magnusjonsson:mjack:lv2:harmonic_synth>
         a lv2:Plugin ;
         lv2:binary <harmonic_synth.so> ;
